@@ -1,0 +1,28 @@
+name: validate
+
+on:
+  pull_request:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Validate registry and repository layout
+        run: ./scripts/validate-registry.sh
+
+      - name: Check shell script syntax
+        run: |
+          while IFS= read -r file; do
+            bash -n "$file"
+          done < <(find scripts shared agents -type f -name '*.sh' | sort)

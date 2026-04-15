@@ -1,0 +1,17 @@
+name: hermes
+version: "2026.4.13"
+base: ubuntu
+image:
+  repository: agent-hub/hermes
+  tag: dev
+source:
+  type: git
+  repository: https://github.com/NousResearch/hermes-agent.git
+  ref: v2026.4.13
+runtime:
+  entrypoint: /opt/agent/entrypoint.sh
+  healthcheck: /opt/agent/healthcheck.sh
+  user: agent
+metadata:
+  description: Real Hermes Agent runtime image built from the official NousResearch/hermes-agent source.
+  category: platform-agent

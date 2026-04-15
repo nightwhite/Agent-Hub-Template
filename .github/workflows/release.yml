@@ -1,0 +1,117 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: Optional image tag override
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      owner_lc: ${{ steps.owner.outputs.value }}
+      bases: ${{ steps.bases.outputs.matrix }}
+      agents: ${{ steps.agents.outputs.matrix }}
+      image_tag: ${{ steps.tag.outputs.value }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Normalize owner
+        id: owner
+        run: echo "value=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve image tag
+        id: tag
+        run: |
+          if [[ -n "${{ github.event.inputs.image_tag || '' }}" ]]; then
+            echo "value=${{ github.event.inputs.image_tag }}" >> "$GITHUB_OUTPUT"
+          elif [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            echo "value=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=manual-${GITHUB_RUN_ID}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Generate base matrix
+        id: bases
+        run: echo "matrix=$(./scripts/generate-matrix.sh bases)" >> "$GITHUB_OUTPUT"
+
+      - name: Generate agent matrix
+        id: agents
+        run: echo "matrix=$(./scripts/generate-matrix.sh agents)" >> "$GITHUB_OUTPUT"
+
+  publish-bases:
+    needs: prepare
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.prepare.outputs.bases) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build base image
+        env:
+          REGISTRY_OVERRIDE: ghcr.io/${{ needs.prepare.outputs.owner_lc }}/base-${{ matrix.name }}
+          BASE_TAG: ${{ needs.prepare.outputs.image_tag }}
+        run: ./scripts/build-base.sh "${{ matrix.name }}"
+
+      - name: Push base image
+        run: docker push "ghcr.io/${{ needs.prepare.outputs.owner_lc }}/base-${{ matrix.name }}:${{ needs.prepare.outputs.image_tag }}"
+
+  publish-agents:
+    needs: [prepare, publish-bases]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.prepare.outputs.agents) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build agent image
+        env:
+          BASE_REGISTRY_OVERRIDE: ghcr.io/${{ needs.prepare.outputs.owner_lc }}/base-${{ matrix.base }}
+          AGENT_REGISTRY_OVERRIDE: ghcr.io/${{ needs.prepare.outputs.owner_lc }}/${{ matrix.name }}
+          BASE_TAG: ${{ needs.prepare.outputs.image_tag }}
+          AGENT_TAG: ${{ needs.prepare.outputs.image_tag }}
+        run: ./scripts/build-agent.sh "${{ matrix.name }}"
+
+      - name: Smoke test released image
+        env:
+          AGENT_REGISTRY_OVERRIDE: ghcr.io/${{ needs.prepare.outputs.owner_lc }}/${{ matrix.name }}
+          AGENT_TAG: ${{ needs.prepare.outputs.image_tag }}
+        run: ./scripts/test-agent.sh "${{ matrix.name }}"
+
+      - name: Push agent image
+        run: docker push "ghcr.io/${{ needs.prepare.outputs.owner_lc }}/${{ matrix.name }}:${{ needs.prepare.outputs.image_tag }}"

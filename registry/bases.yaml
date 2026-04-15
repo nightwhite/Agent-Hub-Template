@@ -1,0 +1,5 @@
+bases:
+  - name: ubuntu
+    path: base/ubuntu
+    image: agent-hub/base-ubuntu:dev
+    enabled: true

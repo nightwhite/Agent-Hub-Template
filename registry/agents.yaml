@@ -1,0 +1,6 @@
+agents:
+  - name: hermes
+    path: agents/hermes
+    base: ubuntu
+    image: agent-hub/hermes:dev
+    enabled: true

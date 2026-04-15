@@ -1,0 +1,72 @@
+name: build
+
+on:
+  pull_request:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  prepare-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      bases: ${{ steps.bases.outputs.matrix }}
+      agents: ${{ steps.agents.outputs.matrix }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Generate base matrix
+        id: bases
+        run: echo "matrix=$(./scripts/generate-matrix.sh bases)" >> "$GITHUB_OUTPUT"
+
+      - name: Generate agent matrix
+        id: agents
+        run: echo "matrix=$(./scripts/generate-matrix.sh agents)" >> "$GITHUB_OUTPUT"
+
+  build-bases:
+    needs: prepare-matrix
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.prepare-matrix.outputs.bases) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build base image
+        env:
+          BASE_TAG: ci-${{ github.run_id }}
+        run: ./scripts/build-base.sh "${{ matrix.name }}"
+
+  build-agents:
+    needs: prepare-matrix
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.prepare-matrix.outputs.agents) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build required base image for agent
+        env:
+          BASE_TAG: ci-${{ github.run_id }}
+        run: ./scripts/build-base.sh "${{ matrix.base }}"
+
+      - name: Build agent image
+        env:
+          BASE_TAG: ci-${{ github.run_id }}
+          AGENT_TAG: ci-${{ github.run_id }}
+        run: ./scripts/build-agent.sh "${{ matrix.name }}"
+
+      - name: Smoke test agent image
+        env:
+          AGENT_TAG: ci-${{ github.run_id }}
+        run: ./scripts/test-agent.sh "${{ matrix.name }}"

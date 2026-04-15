@@ -1,0 +1,17 @@
+name: change-me
+version: "0.1.0"
+base: ubuntu
+image:
+  repository: agent-hub/change-me
+  tag: dev
+source:
+  type: manual
+  repository: replace-me
+  ref: main
+runtime:
+  entrypoint: /opt/agent/entrypoint.sh
+  healthcheck: /opt/agent/healthcheck.sh
+  user: agent
+metadata:
+  description: Template definition for a new agent image.
+  category: custom-agent

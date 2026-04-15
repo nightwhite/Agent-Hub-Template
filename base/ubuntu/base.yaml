@@ -1,0 +1,9 @@
+name: ubuntu
+version: "24.04"
+source: ubuntu:24.04
+image:
+  repository: agent-hub/base-ubuntu
+  tag: dev
+platforms:
+  - linux/amd64
+description: Common Ubuntu-based runtime image for agent builds.
