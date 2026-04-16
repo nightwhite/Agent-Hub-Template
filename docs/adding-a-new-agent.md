@@ -30,7 +30,7 @@ make new-agent AGENT=my-agent
 5. 运行：
 
 ```bash
-make validate
+make doctor
 make build-agent AGENT=my-agent
 make test-agent AGENT=my-agent
 ```
@@ -42,6 +42,7 @@ make test-agent AGENT=my-agent
 ```bash
 make list-agents
 make status-agents
+make doctor
 make enable-agent AGENT=my-agent
 make disable-agent AGENT=my-agent
 ```
@@ -368,6 +369,7 @@ docker run --rm my-agent:dev --version
 
 ```bash
 make validate
+make doctor
 ```
 
 这一步会检查：

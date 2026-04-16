@@ -3,7 +3,7 @@ SHELL := /bin/bash
 BASE ?= ubuntu
 AGENT ?= hermes
 
-.PHONY: help build-base build-agent build-all validate new-agent test-agent test-all enable-agent disable-agent list-agents status-agents
+.PHONY: help build-base build-agent build-all validate new-agent test-agent test-all enable-agent disable-agent list-agents status-agents doctor
 
 help:
 	@echo "Targets:"
@@ -18,6 +18,7 @@ help:
 	@echo "  make disable-agent AGENT=hermes"
 	@echo "  make list-agents"
 	@echo "  make status-agents"
+	@echo "  make doctor"
 
 build-base:
 	./scripts/build-base.sh $(BASE)
@@ -51,3 +52,6 @@ list-agents:
 
 status-agents:
 	./scripts/status-agents.sh
+
+doctor:
+	./scripts/doctor.sh

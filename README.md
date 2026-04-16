@@ -189,6 +189,7 @@ Reference: [`base/ubuntu/README.md`](./base/ubuntu/README.md)
 
 ```bash
 make validate
+make doctor
 ```
 
 ### Build the shared base
@@ -226,7 +227,7 @@ make disable-agent AGENT=hermes
 For a new contributor, this is the shortest happy path:
 
 ```bash
-make validate
+make doctor
 make build-base BASE=ubuntu
 make build-agent AGENT=hermes
 make test-agent AGENT=hermes
@@ -301,6 +302,7 @@ You can do that without editing YAML manually:
 ```bash
 make list-agents
 make status-agents
+make doctor
 make enable-agent AGENT=my-agent
 make disable-agent AGENT=my-agent
 ```
