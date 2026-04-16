@@ -185,6 +185,26 @@ def load_registry(kind: str) -> list[dict[str, Any]]:
     return normalized
 
 
+def write_registry(kind: str, entries: list[dict[str, Any]]) -> None:
+    path = REGISTRY_FILES[kind]
+    lines = [f"{kind}:"]
+    for entry in entries:
+        lines.append(f"  - name: {entry['name']}")
+        lines.append(f"    path: {entry['path']}")
+        lines.append(f"    enabled: {'true' if entry['enabled'] else 'false'}")
+    path.write_text("\n".join(lines) + "\n")
+
+
+def set_registry_enabled(kind: str, name: str, enabled: bool) -> dict[str, Any]:
+    entries = load_registry(kind)
+    for entry in entries:
+        if entry["name"] == name:
+            entry["enabled"] = enabled
+            write_registry(kind, entries)
+            return entry
+    raise SystemExit(f"Unknown {kind[:-1]} in registry/{kind}.yaml: {name}")
+
+
 def load_agent_meta(agent_name: str) -> dict[str, Any]:
     registry_entry = next((item for item in load_registry("agents") if item["name"] == agent_name), None)
     if not registry_entry:
@@ -443,6 +463,11 @@ def main() -> None:
     matrix.add_argument("kind", choices=("agents", "bases"))
     matrix.add_argument("--enabled-only", action="store_true")
 
+    set_enabled = subparsers.add_parser("set-enabled", help="Enable or disable a registry entry")
+    set_enabled.add_argument("kind", choices=("agents", "bases"))
+    set_enabled.add_argument("name")
+    set_enabled.add_argument("state", choices=("true", "false", "enabled", "disabled"))
+
     subparsers.add_parser("validate", help="Validate repo structure and metadata")
 
     args = parser.parse_args()
@@ -477,6 +502,12 @@ def main() -> None:
 
     if args.command == "matrix":
         print(json.dumps(matrix_for(args.kind, args.enabled_only)))
+        return
+
+    if args.command == "set-enabled":
+        enabled = args.state in {"true", "enabled"}
+        entry = set_registry_enabled(args.kind, args.name, enabled)
+        print(json.dumps(entry))
         return
 
     if args.command == "validate":

@@ -212,8 +212,10 @@ make test-agent AGENT=hermes
 ### Build and test everything you have explicitly enabled in the registry
 
 ```bash
+make enable-agent AGENT=hermes
 make build-all
 make test-all
+make disable-agent AGENT=hermes
 ```
 
 ---
@@ -292,6 +294,13 @@ make test-agent AGENT=my-agent
 ```
 
 If the new agent should participate in repo-wide automation, keep it registered but leave `enabled: false` by default. Only switch that one flag to `enabled: true` when you explicitly want it to join `build-all`, `test-all`, or CI.
+
+You can do that without editing YAML manually:
+
+```bash
+make enable-agent AGENT=my-agent
+make disable-agent AGENT=my-agent
+```
 
 More guidance: [`docs/adding-a-new-agent.md`](./docs/adding-a-new-agent.md)
 

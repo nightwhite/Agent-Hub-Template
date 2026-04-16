@@ -37,6 +37,13 @@ make test-agent AGENT=my-agent
 
 6. 通过后再把 `registry/agents.yaml` 里的 `enabled: false` 改成 `enabled: true`
 
+也可以直接用：
+
+```bash
+make enable-agent AGENT=my-agent
+make disable-agent AGENT=my-agent
+```
+
 你只需要关心两处：
 - `agents/<name>/`：实现 agent 自己的一切
 - `registry/agents.yaml`：声明仓库是否识别/启用这个 agent
@@ -406,6 +413,12 @@ make test-agent AGENT=my-agent
 enabled: true
 ```
 
+或者直接执行：
+
+```bash
+make enable-agent AGENT=<name>
+```
+
 推荐条件：
 
 1. `make validate` 通过
@@ -418,6 +431,12 @@ enabled: true
 - `make build-all`
 - `make test-all`
 - GitHub Actions 的统一流程
+
+如果之后不想让它继续参与批量构建，也可以直接执行：
+
+```bash
+make disable-agent AGENT=<name>
+```
 
 ---
 
