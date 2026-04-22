@@ -89,6 +89,10 @@ EOF
 # Example custom endpoint values:
 # OPENAI_API_KEY=
 # OPENAI_BASE_URL=
+API_SERVER_ENABLED=true
+API_SERVER_HOST=0.0.0.0
+API_SERVER_PORT=8642
+API_SERVER_KEY=change-me-local-dev
 EOF
   fi
 }

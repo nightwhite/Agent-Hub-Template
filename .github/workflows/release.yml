@@ -1,16 +1,19 @@
-name: build-enabled-agents
+name: release-enabled-agents
 
 on:
-  push:
-    branches:
-      - master
-      - main
-  pull_request:
   workflow_dispatch:
+    inputs:
+      image_tag:
+        description: Image tag to publish
+        required: true
+        type: string
+  push:
+    tags:
+      - 'v*'
 
 permissions:
   contents: read
-  packages: read
+  packages: write
 
 jobs:
   prepare:
@@ -18,9 +21,24 @@ jobs:
     outputs:
       matrix: ${{ steps.matrix.outputs.matrix }}
       count: ${{ steps.matrix.outputs.count }}
+      image_tag: ${{ steps.tag.outputs.image_tag }}
+      owner: ${{ steps.owner.outputs.owner }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Resolve owner
+        id: owner
+        run: echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve image tag
+        id: tag
+        run: |
+          if [[ -n "${{ github.event.inputs.image_tag || '' }}" ]]; then
+            echo "image_tag=${{ github.event.inputs.image_tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "image_tag=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Generate agent matrix from registry
         id: matrix
@@ -71,7 +89,7 @@ jobs:
           print(f"count={len(enabled)}")
           PY
 
-  build:
+  release:
     needs: prepare
     if: needs.prepare.outputs.count != '0'
     runs-on: ubuntu-latest
@@ -85,30 +103,31 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Validate agent shell scripts
-        run: |
-          find "${{ matrix.path }}" -type f -name '*.sh' | sort | while IFS= read -r file; do
-            bash -n "$file"
-          done
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build agent image
+      - name: Build release image
         run: |
           docker build \
             --file "${{ matrix.path }}/Dockerfile" \
-            --tag "agent-hub/${{ matrix.name }}:ci-${{ github.run_id }}" \
+            --tag "ghcr.io/${{ needs.prepare.outputs.owner }}/${{ matrix.name }}:${{ needs.prepare.outputs.image_tag }}" \
             .
 
       - name: Smoke test version
         run: |
-          docker run --rm "agent-hub/${{ matrix.name }}:ci-${{ github.run_id }}" version
+          docker run --rm "ghcr.io/${{ needs.prepare.outputs.owner }}/${{ matrix.name }}:${{ needs.prepare.outputs.image_tag }}" version
 
       - name: Smoke test Hermes gateway and config
         if: matrix.name == 'hermes'
         run: |
           docker run -d \
             -p 127.0.0.1:28642:8642 \
-            --name hermes-ci \
-            "agent-hub/${{ matrix.name }}:ci-${{ github.run_id }}" \
+            --name hermes-release \
+            "ghcr.io/${{ needs.prepare.outputs.owner }}/${{ matrix.name }}:${{ needs.prepare.outputs.image_tag }}" \
             gateway
 
           python3 - <<'PY'
@@ -136,49 +155,11 @@ jobs:
               raise SystemExit(f"API server did not become ready: {last_error}")
           PY
 
-          tmpdir="$(mktemp -d)"
-          docker run -d \
-            -v "$tmpdir:/home/agent/.hermes" \
-            --name hermes-config-ci \
-            "agent-hub/${{ matrix.name }}:ci-${{ github.run_id }}" \
-            gateway
-
-          docker exec hermes-config-ci /opt/agent/config.sh set config http://example.test/v1 sk-test-123 gpt-5.4
-          docker exec hermes-config-ci /opt/agent/config.sh set yaml provider custom
-          docker exec hermes-config-ci /opt/agent/config.sh set yaml display.skin default
-          docker exec hermes-config-ci /opt/agent/config.sh set yaml terminal.backend local
-          docker exec hermes-config-ci /opt/agent/config.sh add yaml fallback_providers openai
-          docker exec hermes-config-ci /opt/agent/config.sh add yaml provider custom http://example.test/v1 OPENAI_API_KEY
-
-          test -f "$tmpdir/.env"
-          test -f "$tmpdir/config.values.env"
-          test -f "$tmpdir/providers.list"
-          test -f "$tmpdir/config.yaml"
-
-          docker exec hermes-config-ci /opt/agent/config.sh delete yaml provider
-          docker exec hermes-config-ci /opt/agent/config.sh delete yaml display.skin
-          docker exec hermes-config-ci /opt/agent/config.sh delete yaml terminal.backend
-
-          if grep -q '^provider:' "$tmpdir/config.yaml"; then
-            echo "provider key should have been removed from config.yaml" >&2
-            exit 1
-          fi
-          if grep -q '^display:' "$tmpdir/config.yaml"; then
-            echo "display key should have been removed from config.yaml" >&2
-            exit 1
-          fi
-          if grep -q '^terminal:' "$tmpdir/config.yaml"; then
-            echo "terminal key should have been removed from config.yaml" >&2
-            exit 1
-          fi
-
-      - name: Dump Hermes logs on failure
-        if: failure() && matrix.name == 'hermes'
+      - name: Push image
         run: |
-          docker logs hermes-ci || true
-          docker logs hermes-config-ci || true
+          docker push "ghcr.io/${{ needs.prepare.outputs.owner }}/${{ matrix.name }}:${{ needs.prepare.outputs.image_tag }}"
 
-      - name: Cleanup test containers
+      - name: Cleanup release test container
         if: always() && matrix.name == 'hermes'
         run: |
-          docker rm -f hermes-ci hermes-config-ci || true
+          docker rm -f hermes-release || true

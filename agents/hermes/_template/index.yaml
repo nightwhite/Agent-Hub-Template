@@ -18,6 +18,14 @@ spec:
         - name: hermes
           image: agent-hub/hermes:dev
           imagePullPolicy: IfNotPresent
-          command: ["/opt/agent/entrypoint.sh"]
-          args: ["start"]
+          env:
+            - name: API_SERVER_ENABLED
+              value: "true"
+            - name: API_SERVER_HOST
+              value: "0.0.0.0"
+            - name: API_SERVER_PORT
+              value: "8642"
+            - name: API_SERVER_KEY
+              value: "change-me-local-dev"
+          args: ["gateway"]
           workingDir: /workspace

@@ -7,8 +7,12 @@ source /opt/agent/config.sh
 export CHANGE_ME_HOME="${CHANGE_ME_HOME:-/home/agent/.change-me}"
 mkdir -p "$CHANGE_ME_HOME"
 
+run_as_agent() {
+  exec runuser -u agent -- "$@"
+}
+
 start_agent() {
-  exec /opt/change-me/bin/change-me-run "$@"
+  run_as_agent /opt/change-me/bin/change-me-run "$@"
 }
 
 main() {
