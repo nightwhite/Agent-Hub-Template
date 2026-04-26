@@ -64,6 +64,16 @@ assert runtime_reload.get("skipped") is False, payload
 '
 }
 
+assert_runtime_apply_applied() {
+  local output="$1"
+  printf '%s' "$output" | python3 -c 'import json, sys
+payload = json.load(sys.stdin)
+runtime_apply = payload.get("data", {}).get("runtimeApply", {})
+assert runtime_apply.get("applied") is True, payload
+assert runtime_apply.get("skipped") is False, payload
+'
+}
+
 assert_chat_completion_text() {
   local output_file="$1"
   local label="$2"
@@ -261,9 +271,12 @@ docker run -d \
   "$OPENCLAW_IMAGE" >/dev/null
 wait_for_openclaw
 
-run_config_json "$OPENCLAW_CONTAINER" gateway set-local lan 18789 >/dev/null
-run_config_json "$OPENCLAW_CONTAINER" provider set ccswitch "$CCSWITCH_CONTAINER_BASE_URL" openai-completions >/dev/null
-run_config_json "$OPENCLAW_CONTAINER" model set-main ccswitch "$CCSWITCH_MODEL" >/dev/null
+runtime_output="$(run_config_json "$OPENCLAW_CONTAINER" gateway set-local lan 18789)"
+assert_runtime_apply_applied "$runtime_output"
+runtime_output="$(run_config_json "$OPENCLAW_CONTAINER" provider set ccswitch "$CCSWITCH_CONTAINER_BASE_URL" openai-completions)"
+assert_runtime_apply_applied "$runtime_output"
+runtime_output="$(run_config_json "$OPENCLAW_CONTAINER" model set-main ccswitch "$CCSWITCH_MODEL")"
+assert_runtime_apply_applied "$runtime_output"
 secret_output="$(run_config_json "$OPENCLAW_CONTAINER" provider set-api-key ccswitch "$CCSWITCH_API_KEY")"
 assert_runtime_reload_applied "$secret_output"
 openclaw_output="$(mktemp)"

@@ -82,6 +82,7 @@ ensure_openclaw_state() {
   "gateway": {
     "mode": "local",
     "bind": "lan",
+    "port": 18789,
     "auth": {
       "mode": "token"
     }
@@ -244,18 +245,13 @@ with_secrets_reload_status() {
   local auth_data="$1"
   local gateway_ready=0
   local reload_attempts="${OPENCLAW_SECRETS_RELOAD_RETRIES:-5}"
-  local wait_seconds="${OPENCLAW_SECRETS_RELOAD_WAIT_SECONDS:-30}"
   local reload_data
   local reload_error
   local reload_error_file
 
-  for _ in $(seq 1 "$((wait_seconds + 1))"); do
-    if openclaw_cli gateway health --json >/dev/null 2>&1; then
-      gateway_ready=1
-      break
-    fi
-    sleep 1
-  done
+  if wait_for_gateway_ready; then
+    gateway_ready=1
+  fi
 
   if [[ "$gateway_ready" -ne 1 ]]; then
     node - "$auth_data" <<'NODE'
@@ -335,6 +331,217 @@ process.stdout.write(JSON.stringify(payload));
 NODE
 }
 
+wait_for_gateway_ready() {
+  local wait_seconds="${OPENCLAW_RUNTIME_APPLY_WAIT_SECONDS:-30}"
+  local timeout_ms="${OPENCLAW_GATEWAY_HEALTH_TIMEOUT_MS:-3000}"
+
+  for _ in $(seq 1 "$((wait_seconds + 1))"); do
+    if openclaw_cli gateway health --json --timeout "$timeout_ms" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 1
+  done
+
+  return 1
+}
+
+gateway_call_json() {
+  local method="${1:?missing gateway method}"
+  local params="${2:-}"
+  [[ -n "$params" ]] || params='{}'
+  openclaw_cli gateway call "$method" \
+    --params "$params" \
+    --json \
+    --timeout "${OPENCLAW_GATEWAY_CALL_TIMEOUT_MS:-30000}"
+}
+
+gateway_config_patch_json() {
+  local raw_patch="${1:?missing config patch}"
+  local snapshot
+  local params
+
+  snapshot="$(gateway_call_json config.get '{}')" || return 1
+  params="$(node - "$raw_patch" "$snapshot" <<'NODE'
+const [rawPatch, snapshotRaw] = process.argv.slice(2);
+const snapshot = JSON.parse(snapshotRaw);
+const baseHash = snapshot.hash || snapshot.configHash || snapshot.persistedHash;
+if (!baseHash) {
+  throw new Error('config.get did not return a base hash');
+}
+process.stdout.write(JSON.stringify({
+  raw: rawPatch,
+  baseHash,
+  restartDelayMs: 0,
+  note: 'Devbox adapter config update',
+}));
+NODE
+)" || return 1
+
+  gateway_call_json config.patch "$params"
+}
+
+build_model_patch() {
+  local provider="${1:?missing provider}"
+  local model="${2:?missing model}"
+  node - "$provider" "$model" <<'NODE'
+const [provider, model] = process.argv.slice(2);
+process.stdout.write(JSON.stringify({
+  agents: {
+    defaults: {
+      model: {
+        primary: `${provider}/${model}`,
+      },
+    },
+  },
+}));
+NODE
+}
+
+build_provider_patch() {
+  local provider="${1:?missing provider}"
+  local payload="${2:?missing provider payload}"
+  node - "$provider" "$payload" <<'NODE'
+const [provider, payloadRaw] = process.argv.slice(2);
+process.stdout.write(JSON.stringify({
+  models: {
+    providers: {
+      [provider]: JSON.parse(payloadRaw),
+    },
+  },
+}));
+NODE
+}
+
+build_provider_delete_patch() {
+  local provider="${1:?missing provider}"
+  node - "$provider" <<'NODE'
+const [provider] = process.argv.slice(2);
+process.stdout.write(JSON.stringify({
+  models: {
+    providers: {
+      [provider]: null,
+    },
+  },
+}));
+NODE
+}
+
+build_workspace_patch() {
+  local workspace="${1:?missing workspace}"
+  node - "$workspace" <<'NODE'
+const [workspace] = process.argv.slice(2);
+process.stdout.write(JSON.stringify({
+  agents: {
+    defaults: {
+      workspace,
+    },
+  },
+}));
+NODE
+}
+
+gateway_local_is_runtime_noop() {
+  local current_json="${1:-}"
+  local bind="${2:?missing bind}"
+  local port="${3:?missing port}"
+  [[ -n "$current_json" ]] || current_json='{}'
+  node - "$current_json" "$bind" "$port" <<'NODE'
+const [currentRaw, desiredBind, desiredPortRaw] = process.argv.slice(2);
+const current = currentRaw ? JSON.parse(currentRaw) : {};
+const currentMode = current.mode ?? 'local';
+const currentBind = current.bind ?? 'lan';
+const currentPort = current.port ?? 18789;
+const desiredPort = Number(desiredPortRaw);
+if (!Number.isInteger(desiredPort) || desiredPort <= 0) {
+  process.exit(2);
+}
+process.exit(currentMode === 'local' && currentBind === desiredBind && Number(currentPort) === desiredPort ? 0 : 1);
+NODE
+}
+
+combine_data_with_runtime_patch() {
+  local data="${1:-}"
+  local patch_result="${2:-}"
+  [[ -n "$data" ]] || data='{}'
+  [[ -n "$patch_result" ]] || patch_result='{}'
+  node - "$data" "$patch_result" <<'NODE'
+const [dataRaw, patchRaw] = process.argv.slice(2);
+const parsedData = dataRaw ? JSON.parse(dataRaw) : {};
+const patch = patchRaw ? JSON.parse(patchRaw) : {};
+const restart = patch && typeof patch === 'object' ? patch.restart : undefined;
+const restartRequired = Boolean(restart);
+const applied = !restartRequired;
+const runtimeApply = {
+  applied,
+  skipped: false,
+  method: 'gateway.config.patch',
+  restartRequired,
+  noop: Boolean(patch.noop),
+  path: patch.path ?? null,
+};
+if (restartRequired) {
+  runtimeApply.restart = {
+    coalesced: Boolean(restart.coalesced),
+    delayMs: restart.delayMs ?? null,
+  };
+}
+const data = parsedData && typeof parsedData === 'object' && !Array.isArray(parsedData)
+  ? { ...parsedData, runtimeApply }
+  : { value: parsedData, runtimeApply };
+process.stdout.write(`${applied}\t${JSON.stringify(data)}`);
+NODE
+}
+
+combine_data_with_runtime_skipped() {
+  local data="${1:-}"
+  local reason="${2:-gateway_unavailable}"
+  [[ -n "$data" ]] || data='{}'
+  node - "$data" "$reason" <<'NODE'
+const [dataRaw, reason] = process.argv.slice(2);
+const parsedData = dataRaw ? JSON.parse(dataRaw) : {};
+const runtimeApply = {
+  applied: false,
+  skipped: true,
+  reason,
+};
+const data = parsedData && typeof parsedData === 'object' && !Array.isArray(parsedData)
+  ? { ...parsedData, runtimeApply }
+  : { value: parsedData, runtimeApply };
+process.stdout.write(`false\t${JSON.stringify(data)}`);
+NODE
+}
+
+emit_runtime_success() {
+  local resource="$1"
+  local action="$2"
+  local combined="$3"
+  local applied
+  local data
+
+  applied="${combined%%$'\t'*}"
+  data="${combined#*$'\t'}"
+  json_success "$resource" "$action" "$applied" "$data"
+}
+
+emit_success_from_runtime_reload() {
+  local resource="$1"
+  local action="$2"
+  shift 2
+  local data
+  local applied
+
+  if ! data="$($@)"; then
+    fail "failed to apply ${resource} ${action}"
+  fi
+
+  applied="$(node - "$data" <<'NODE'
+const data = JSON.parse(process.argv[2] || '{}');
+process.stdout.write(data?.runtimeReload?.applied === true ? 'true' : 'false');
+NODE
+)"
+  json_success "$resource" "$action" "$applied" "$data"
+}
+
 usage() {
   json_error "" "" "usage" "usage: config.sh <resource> <action> [args...]"
   exit 1
@@ -371,8 +578,17 @@ dispatch_config() {
     model:set-main)
       require_arg "${1-}" "provider"
       require_arg "${2-}" "model"
-      run_or_fail "failed to set main model" openclaw_cli config set agents.defaults.model.primary "$1/$2"
-      emit_success_from "$resource" "$action" openclaw_cli config get agents.defaults.model --json
+      local patch_result
+      local data
+      if wait_for_gateway_ready; then
+        patch_result="$(gateway_config_patch_json "$(build_model_patch "$1" "$2")")" || fail "failed to apply main model to running gateway"
+        data="$(openclaw_cli config get agents.defaults.model --json)" || fail "failed to read main model"
+        emit_runtime_success "$resource" "$action" "$(combine_data_with_runtime_patch "$data" "$patch_result")"
+      else
+        run_or_fail "failed to set main model" openclaw_cli config set agents.defaults.model.primary "$1/$2"
+        data="$(openclaw_cli config get agents.defaults.model --json)" || fail "failed to read main model"
+        emit_runtime_success "$resource" "$action" "$(combine_data_with_runtime_skipped "$data")"
+      fi
       ;;
     model:get-main)
       emit_success_from "$resource" "$action" openclaw_cli config get agents.defaults.model --json
@@ -394,8 +610,17 @@ dispatch_config() {
       if ! payload="$(build_provider_payload "$current_payload" "$base_url" "$api_mode")"; then
         fail "failed to build provider payload"
       fi
-      run_or_fail "failed to set provider" openclaw_cli config set "models.providers.${provider}" "$payload" --strict-json
-      emit_success_from "$resource" "$action" openclaw_cli config get "models.providers.${provider}" --json
+      local patch_result
+      local data
+      if wait_for_gateway_ready; then
+        patch_result="$(gateway_config_patch_json "$(build_provider_patch "$provider" "$payload")")" || fail "failed to apply provider to running gateway"
+        data="$(openclaw_cli config get "models.providers.${provider}" --json)" || fail "failed to read provider"
+        emit_runtime_success "$resource" "$action" "$(combine_data_with_runtime_patch "$data" "$patch_result")"
+      else
+        run_or_fail "failed to set provider" openclaw_cli config set "models.providers.${provider}" "$payload" --strict-json
+        data="$(openclaw_cli config get "models.providers.${provider}" --json)" || fail "failed to read provider"
+        emit_runtime_success "$resource" "$action" "$(combine_data_with_runtime_skipped "$data")"
+      fi
       ;;
     provider:get)
       require_arg "${1-}" "provider"
@@ -403,13 +628,20 @@ dispatch_config() {
       ;;
     provider:delete)
       require_arg "${1-}" "provider"
-      run_or_fail "failed to delete provider" openclaw_cli config unset "models.providers.${1}"
-      json_success "$resource" "$action" true '{"deleted":true}'
+      local patch_result
+      local data='{"deleted":true}'
+      if wait_for_gateway_ready; then
+        patch_result="$(gateway_config_patch_json "$(build_provider_delete_patch "$1")")" || fail "failed to delete provider from running gateway"
+        emit_runtime_success "$resource" "$action" "$(combine_data_with_runtime_patch "$data" "$patch_result")"
+      else
+        run_or_fail "failed to delete provider" openclaw_cli config unset "models.providers.${1}"
+        emit_runtime_success "$resource" "$action" "$(combine_data_with_runtime_skipped "$data")"
+      fi
       ;;
     provider:set-api-key)
       require_arg "${1-}" "provider"
       require_arg "${2-}" "api key"
-      emit_success_from "$resource" "$action" auth_profile_json_with_reload set-api-key "$1" "$2" "${3:-}"
+      emit_success_from_runtime_reload "$resource" "$action" auth_profile_json_with_reload set-api-key "$1" "$2" "${3:-}"
       ;;
     provider:get-api-key)
       require_arg "${1-}" "provider"
@@ -417,15 +649,26 @@ dispatch_config() {
       ;;
     provider:delete-api-key)
       require_arg "${1-}" "provider"
-      emit_success_from "$resource" "$action" auth_profile_json_with_reload delete-api-key "$1" "" "${2:-}"
+      emit_success_from_runtime_reload "$resource" "$action" auth_profile_json_with_reload delete-api-key "$1" "" "${2:-}"
       ;;
     gateway:set-local)
       local bind="${1:-lan}"
       local port="${2:-18789}"
-      run_or_fail "failed to set gateway mode" openclaw_cli config set gateway.mode local
-      run_or_fail "failed to set gateway bind" openclaw_cli config set gateway.bind "$bind"
-      run_or_fail "failed to set gateway port" openclaw_cli config set gateway.port "$port" --strict-json
-      emit_success_from "$resource" "$action" openclaw_cli config get gateway --json
+      local data
+      data="$(openclaw_cli config get gateway --json)" || fail "failed to read gateway config"
+      if wait_for_gateway_ready; then
+        if gateway_local_is_runtime_noop "$data" "$bind" "$port"; then
+          emit_runtime_success "$resource" "$action" "$(combine_data_with_runtime_patch "$data" '{"noop":true,"path":null}')"
+        else
+          fail "gateway bind/port changes require a gateway restart and are not supported as an immediate runtime config action"
+        fi
+      else
+        run_or_fail "failed to set gateway mode" openclaw_cli config set gateway.mode local
+        run_or_fail "failed to set gateway bind" openclaw_cli config set gateway.bind "$bind"
+        run_or_fail "failed to set gateway port" openclaw_cli config set gateway.port "$port" --strict-json
+        data="$(openclaw_cli config get gateway --json)" || fail "failed to read gateway config"
+        emit_runtime_success "$resource" "$action" "$(combine_data_with_runtime_skipped "$data")"
+      fi
       ;;
     gateway:get-local)
       emit_success_from "$resource" "$action" openclaw_cli config get gateway --json
@@ -445,8 +688,17 @@ dispatch_config() {
       ;;
     workspace:set)
       require_arg "${1-}" "workspace path"
-      run_or_fail "failed to set workspace" openclaw_cli config set agents.defaults.workspace "$1"
-      emit_success_from "$resource" "$action" openclaw_cli config get agents.defaults.workspace --json
+      local patch_result
+      local data
+      if wait_for_gateway_ready; then
+        patch_result="$(gateway_config_patch_json "$(build_workspace_patch "$1")")" || fail "failed to apply workspace to running gateway"
+        data="$(openclaw_cli config get agents.defaults.workspace --json)" || fail "failed to read workspace"
+        emit_runtime_success "$resource" "$action" "$(combine_data_with_runtime_patch "$data" "$patch_result")"
+      else
+        run_or_fail "failed to set workspace" openclaw_cli config set agents.defaults.workspace "$1"
+        data="$(openclaw_cli config get agents.defaults.workspace --json)" || fail "failed to read workspace"
+        emit_runtime_success "$resource" "$action" "$(combine_data_with_runtime_skipped "$data")"
+      fi
       ;;
     workspace:get)
       emit_success_from "$resource" "$action" openclaw_cli config get agents.defaults.workspace --json

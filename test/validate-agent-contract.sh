@@ -20,9 +20,8 @@ validate_json_file() {
 
 validate_yaml_file() {
   local file="$1"
-  if command -v ruby >/dev/null 2>&1; then
-    ruby -e 'require "yaml"; YAML.load_file(ARGV[0])' "$file" >/dev/null
-  fi
+  command -v ruby >/dev/null 2>&1 || fail "ruby is required to validate YAML: $file"
+  ruby -e 'require "yaml"; YAML.load_file(ARGV[0])' "$file" >/dev/null
 }
 
 validate_manifest() {

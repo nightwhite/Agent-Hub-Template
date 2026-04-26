@@ -1,6 +1,6 @@
 # `change-me` Agent 模板
 
-先阅读 [docs/adding-a-new-agent.md](/Users/night/Documents/code/sealos/Agent-Hub-Template/docs/adding-a-new-agent.md)。
+先阅读 [docs/adding-a-new-agent.md](../../docs/adding-a-new-agent.md)。
 
 这个目录只提供第一阶段接入骨架，不提供统一配置 schema。
 

@@ -69,6 +69,16 @@ assert runtime_reload.get("skipped") is False, payload
 '
 }
 
+assert_runtime_apply_applied() {
+  local output="$1"
+  printf '%s' "$output" | python3 -c 'import json, sys
+payload = json.load(sys.stdin)
+runtime_apply = payload.get("data", {}).get("runtimeApply", {})
+assert runtime_apply.get("applied") is True, payload
+assert runtime_apply.get("skipped") is False, payload
+'
+}
+
 assert_openclaw_infer_json() {
   local output_file="$1"
   python3 - "$output_file" "$CCSWITCH_MODEL" <<'PY'
@@ -203,9 +213,12 @@ docker exec "$CONTAINER" /opt/agent/entrypoint.sh run config file >/dev/null
 
 printf '==> mutating OpenClaw native config through JSON protocol\n'
 run_config_json gateway get-local >/dev/null
-run_config_json gateway set-local lan 18789 >/dev/null
-run_config_json provider set ccswitch "$CCSWITCH_CONTAINER_BASE_URL" openai-completions >/dev/null
-run_config_json model set-main ccswitch "$CCSWITCH_MODEL" >/dev/null
+runtime_output="$(run_config_json gateway set-local lan 18789)"
+assert_runtime_apply_applied "$runtime_output"
+runtime_output="$(run_config_json provider set ccswitch "$CCSWITCH_CONTAINER_BASE_URL" openai-completions)"
+assert_runtime_apply_applied "$runtime_output"
+runtime_output="$(run_config_json model set-main ccswitch "$CCSWITCH_MODEL")"
+assert_runtime_apply_applied "$runtime_output"
 secret_output="$(run_config_json provider set-api-key ccswitch "$CCSWITCH_API_KEY")"
 [[ "$secret_output" != *"$CCSWITCH_API_KEY"* ]] || fail "secret value leaked in provider set-api-key output"
 assert_runtime_reload_applied "$secret_output"

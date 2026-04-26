@@ -15,7 +15,7 @@ log() {
 }
 
 json_quote() {
-  python3 -c 'import json, sys; print(json.dumps(sys.argv[1], ensure_ascii=False))' "${1-}"
+  "$HERMES_PYTHON" -c 'import json, sys; print(json.dumps(sys.argv[1], ensure_ascii=False))' "${1-}"
 }
 
 json_success() {

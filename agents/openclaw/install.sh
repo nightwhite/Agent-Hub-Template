@@ -50,6 +50,7 @@ write_default_state() {
   "gateway": {
     "mode": "local",
     "bind": "lan",
+    "port": 18789,
     "auth": {
       "mode": "token"
     }
