@@ -118,6 +118,20 @@ cat /opt/agent/config.json
 - `agents/hermes-agent`: 基于 Hermes 原生 `config.yaml + .env + hermes gateway run`
 - `agents/openclaw`: 基于 OpenClaw 原生 `openclaw.json + .env + openclaw gateway run`
 
+## 镜像版本规则
+
+镜像 tag 由 GitHub Actions 生成，模板里的 `image` 跟随 Actions 回写。
+
+- 合并到 `master` / `main` 后发布开发镜像：
+  - 不可变 tag: `dev-<merge-sha12>`
+  - 浮动 tag: `dev`
+  - 发布成功后，Actions 自动把 enabled agents 的 `index.json.image` 和 `deploy.yaml image` 回写成 `dev-<merge-sha12>`
+- 正式发布时，每个 agent 使用自己的 `index.json.version` 作为镜像 tag：
+  - `agents/hermes-agent/index.json` 的 `version` 决定 `ghcr.io/<owner>/hermes-agent:<version>`
+  - `agents/openclaw/index.json` 的 `version` 决定 `ghcr.io/<owner>/openclaw:<version>`
+
+不要手动把正式版本号写成统一仓库 tag。正式版本是 agent 维度的版本，开发版本是合并提交维度的版本。
+
 ## 本地验证
 
 ```bash

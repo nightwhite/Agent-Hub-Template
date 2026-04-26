@@ -2,11 +2,6 @@ name: release-enabled-agents
 
 on:
   workflow_dispatch:
-    inputs:
-      image_tag:
-        description: Image tag to publish
-        required: true
-        type: string
   push:
     branches:
       - master
@@ -24,7 +19,6 @@ jobs:
     outputs:
       matrix: ${{ steps.matrix.outputs.matrix }}
       count: ${{ steps.matrix.outputs.count }}
-      image_tag: ${{ steps.tag.outputs.image_tag }}
       owner: ${{ steps.owner.outputs.owner }}
     steps:
       - name: Checkout
@@ -36,21 +30,6 @@ jobs:
       - name: Resolve owner
         id: owner
         run: echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
-
-      - name: Resolve image tag
-        id: tag
-        env:
-          INPUT_IMAGE_TAG: ${{ github.event.inputs.image_tag || '' }}
-          REF_NAME: ${{ github.ref_name }}
-          REF_TYPE: ${{ github.ref_type }}
-        run: |
-          if [[ -n "$INPUT_IMAGE_TAG" ]]; then
-            echo "image_tag=$INPUT_IMAGE_TAG" >> "$GITHUB_OUTPUT"
-          elif [[ "$REF_TYPE" == "tag" ]]; then
-            echo "image_tag=${REF_NAME#v}" >> "$GITHUB_OUTPUT"
-          else
-            echo "image_tag=dev" >> "$GITHUB_OUTPUT"
-          fi
 
       - name: Generate agent matrix from registry
         id: matrix
@@ -92,6 +71,7 @@ jobs:
               {
                   "name": item["name"],
                   "path": item["path"],
+                  "version": json.loads(Path(item["path"], "index.json").read_text())["version"],
               }
               for item in items
               if item.get("enabled") is True
@@ -122,13 +102,133 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build release image
+      - name: Resolve image tags
+        id: tags
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          AGENT_VERSION: ${{ matrix.version }}
         run: |
+          if [[ "$EVENT_NAME" == "push" && "$REF_TYPE" == "branch" ]]; then
+            short_sha="${GITHUB_SHA::12}"
+            {
+              echo "tags<<EOF"
+              echo "dev-${short_sha}"
+              echo "dev"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+          else
+            {
+              echo "tags<<EOF"
+              echo "$AGENT_VERSION"
+              echo "EOF"
+            } >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build release image
+        env:
+          IMAGE_BASE: ghcr.io/${{ needs.prepare.outputs.owner }}/${{ matrix.name }}
+          IMAGE_TAGS: ${{ steps.tags.outputs.tags }}
+        run: |
+          tag_args=()
+          while IFS= read -r tag; do
+            [[ -n "$tag" ]] || continue
+            tag_args+=(--tag "${IMAGE_BASE}:${tag}")
+          done <<< "$IMAGE_TAGS"
+
           docker build \
             --file "${{ matrix.path }}/Dockerfile" \
-            --tag "ghcr.io/${{ needs.prepare.outputs.owner }}/${{ matrix.name }}:${{ needs.prepare.outputs.image_tag }}" \
+            "${tag_args[@]}" \
             .
 
       - name: Push image
+        env:
+          IMAGE_BASE: ghcr.io/${{ needs.prepare.outputs.owner }}/${{ matrix.name }}
+          IMAGE_TAGS: ${{ steps.tags.outputs.tags }}
         run: |
-          docker push "ghcr.io/${{ needs.prepare.outputs.owner }}/${{ matrix.name }}:${{ needs.prepare.outputs.image_tag }}"
+          while IFS= read -r tag; do
+            [[ -n "$tag" ]] || continue
+            docker push "${IMAGE_BASE}:${tag}"
+          done <<< "$IMAGE_TAGS"
+
+  sync-dev-templates:
+    needs:
+      - prepare
+      - release
+    if: github.event_name == 'push' && github.ref_type == 'branch' && needs.prepare.outputs.count != '0'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Sync dev image refs
+        env:
+          OWNER: ${{ needs.prepare.outputs.owner }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          from pathlib import Path
+
+          owner = os.environ["OWNER"]
+          tag = f"dev-{os.environ['GITHUB_SHA'][:12]}"
+          registry_path = Path("registry/agents.yaml")
+
+          items = []
+          current = None
+          for raw_line in registry_path.read_text().splitlines():
+              line = raw_line.strip()
+              if not line or line.startswith("#") or line == "agents:":
+                  continue
+              if line.startswith("- "):
+                  if current:
+                      items.append(current)
+                  current = {}
+                  line = line[2:]
+              if ":" not in line:
+                  continue
+              key, value = line.split(":", 1)
+              value = value.strip()
+              if value.lower() == "true":
+                  parsed = True
+              elif value.lower() == "false":
+                  parsed = False
+              else:
+                  parsed = value.strip("\"'")
+              if current is not None:
+                  current[key.strip()] = parsed
+          if current:
+              items.append(current)
+
+          for item in items:
+              if item.get("enabled") is not True:
+                  continue
+              name = str(item["name"])
+              path = Path(str(item["path"]))
+              image = f"ghcr.io/{owner}/{name}:{tag}"
+
+              index_path = path / "index.json"
+              index = json.loads(index_path.read_text())
+              index["image"] = image
+              index_path.write_text(json.dumps(index, indent=2) + "\n")
+
+              deploy_path = path / "deploy.yaml"
+              deploy = deploy_path.read_text()
+              deploy = re.sub(r"(^\s*image:\s*).+$", rf"\1{image}", deploy, count=1, flags=re.MULTILINE)
+              deploy_path.write_text(deploy)
+          PY
+
+      - name: Commit synced templates
+        run: |
+          if git diff --quiet; then
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add agents/*/index.json agents/*/deploy.yaml
+          git commit -m "chore: sync dev agent image refs [skip ci]"
+          git push origin "HEAD:${GITHUB_REF_NAME}"
