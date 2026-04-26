@@ -75,6 +75,7 @@ run_as_agent_script() {
 
 ensure_openclaw_state() {
   mkdir -p "$OPENCLAW_STATE_DIR" "$OPENCLAW_WORKSPACE"
+  chmod 700 "$OPENCLAW_STATE_DIR"
 
   if [[ ! -f "$OPENCLAW_CONFIG_PATH" ]]; then
     cat >"$OPENCLAW_CONFIG_PATH" <<EOF_JSON
@@ -115,6 +116,7 @@ EOF_JSON
   if [[ ! -f "$OPENCLAW_DOTENV_FILE" ]]; then
     printf 'OPENCLAW_GATEWAY_TOKEN=%s\n' "$OPENCLAW_GATEWAY_TOKEN" >"$OPENCLAW_DOTENV_FILE"
   fi
+  chmod 600 "$OPENCLAW_CONFIG_PATH" "$OPENCLAW_DOTENV_FILE"
 }
 
 openclaw_cli() {

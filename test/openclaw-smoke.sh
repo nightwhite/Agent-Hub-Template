@@ -267,6 +267,9 @@ assert provider["apiKey"] == expected_api_key, provider
 PY
 rm -f "$openclaw_config_file"
 docker exec "$CONTAINER" cat /home/agent/.openclaw/.env | grep -F "OPENAI_API_KEY=${CCSWITCH_API_KEY}" >/dev/null
+docker exec "$CONTAINER" sh -lc 'test "$(stat -c %a /home/agent/.openclaw)" = "700"'
+docker exec "$CONTAINER" sh -lc 'test "$(stat -c %a /home/agent/.openclaw/.env)" = "600"'
+docker exec "$CONTAINER" sh -lc 'test "$(stat -c %a /home/agent/.openclaw/openclaw.json)" = "600"'
 
 printf '==> checking OpenClaw gateway inference through ccswitch\n'
 infer_output="$(mktemp)"

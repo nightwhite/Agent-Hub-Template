@@ -91,6 +91,7 @@ run_as_agent_script() {
 
 ensure_hermes_state() {
   mkdir -p "$HERMES_HOME"
+  chmod 700 "$HERMES_HOME"
 
   if [[ ! -f "$HERMES_CONFIG_FILE" ]]; then
     cat >"$HERMES_CONFIG_FILE" <<'CFG'
@@ -112,6 +113,7 @@ API_SERVER_PORT=8642
 API_SERVER_KEY=change-me-local-dev
 ENVFILE
   fi
+  chmod 600 "$HERMES_DOTENV_FILE"
 }
 
 require_hermes_python() {

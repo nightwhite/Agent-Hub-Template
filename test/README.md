@@ -1,5 +1,17 @@
 # 本地 Smoke 测试
 
+## 本地依赖
+
+- `python3`: 用于 JSON 校验和部分 smoke 断言。
+- `python3` + `PyYAML` 或 `ruby`: 用于 `deploy.yaml` 语法校验。
+- `docker`: 用于构建和运行 Hermes/OpenClaw smoke 镜像。
+- `curl`: 用于 gateway 和 ccswitch HTTP 检查。
+- `ccswitch-smoke.sh` 还需要本机 ccswitch 监听 `127.0.0.1:15721`。
+
+如果本机没有 PyYAML，脚本会自动回退到 Ruby；两者都没有时，契约校验会明确失败。
+
+## 运行方式
+
 先跑静态契约校验：
 
 ```bash

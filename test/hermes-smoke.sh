@@ -157,6 +157,8 @@ docker exec "$CONTAINER" sh -lc 'grep -q "api_mode: chat_completions" /home/agen
 docker exec "$CONTAINER" sh -lc 'grep -q "key_env: CCSWITCH_API_KEY" /home/agent/.hermes/config.yaml'
 docker exec "$CONTAINER" sh -lc 'grep -q "default: gpt-5.4" /home/agent/.hermes/config.yaml'
 docker exec "$CONTAINER" sh -lc 'grep -q "CCSWITCH_API_KEY=sk-local-test" /home/agent/.hermes/.env'
+docker exec "$CONTAINER" sh -lc 'test "$(stat -c %a /home/agent/.hermes)" = "700"'
+docker exec "$CONTAINER" sh -lc 'test "$(stat -c %a /home/agent/.hermes/.env)" = "600"'
 
 printf '==> checking Hermes API server again\n'
 curl --noproxy '*' -fsS --max-time 5 "http://127.0.0.1:${HOST_PORT}/v1/models" \
