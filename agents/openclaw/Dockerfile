@@ -9,19 +9,15 @@ ARG ALL_PROXY
 ARG no_proxy
 ARG NO_PROXY
 
-ENV AGENT_NAME=hermes \
+ENV AGENT_NAME=openclaw \
     AGENT_RUNTIME_KIND=service \
-    HERMES_HOME=/home/agent/.hermes \
-    HERMES_SRC=/opt/hermes/src \
-    HERMES_VENV=/opt/hermes/venv \
-    API_SERVER_ENABLED=true \
-    API_SERVER_HOST=0.0.0.0 \
-    API_SERVER_PORT=8642 \
-    API_SERVER_KEY=change-me-local-dev \
-    PATH=/opt/hermes/venv/bin:$PATH
+    OPENCLAW_STATE_DIR=/home/agent/.openclaw \
+    OPENCLAW_CONFIG_PATH=/home/agent/.openclaw/openclaw.json \
+    OPENCLAW_WORKSPACE=/workspace \
+    PATH=/usr/local/bin:$PATH
 
-COPY agents/hermes/build.env /tmp/build.env
-COPY agents/hermes/install.sh /tmp/install.sh
+COPY agents/openclaw/build.env /tmp/build.env
+COPY agents/openclaw/install.sh /tmp/install.sh
 RUN chmod +x /tmp/install.sh \
     && set -a \
     && . /tmp/build.env \
@@ -29,17 +25,17 @@ RUN chmod +x /tmp/install.sh \
     && /tmp/install.sh install \
     && rm -f /tmp/build.env /tmp/install.sh
 
-COPY agents/hermes/config.json /opt/agent/config.json
-COPY agents/hermes/config.sh /opt/agent/config.sh
-COPY agents/hermes/entrypoint.sh /opt/agent/entrypoint.sh
+COPY agents/openclaw/config.json /opt/agent/config.json
+COPY agents/openclaw/config.sh /opt/agent/config.sh
+COPY agents/openclaw/entrypoint.sh /opt/agent/entrypoint.sh
 RUN getent group agent >/dev/null || groupadd --gid 10001 agent \
     && id -u agent >/dev/null 2>&1 || useradd --uid 10001 --gid 10001 --create-home --shell /bin/bash agent \
     && chmod +x /opt/agent/config.sh /opt/agent/entrypoint.sh \
     && chmod 0644 /opt/agent/config.json \
-    && mkdir -p "$HERMES_HOME" /workspace \
-    && chown -R agent:agent /opt/agent /opt/hermes /workspace "$HERMES_HOME"
+    && mkdir -p "$OPENCLAW_STATE_DIR" /workspace \
+    && chown -R agent:agent /opt/agent "$OPENCLAW_STATE_DIR" /workspace /home/agent
 
 WORKDIR /workspace
-VOLUME ["/home/agent/.hermes"]
+VOLUME ["/home/agent/.openclaw"]
 ENTRYPOINT ["/init", "/opt/agent/entrypoint.sh"]
 CMD ["start"]

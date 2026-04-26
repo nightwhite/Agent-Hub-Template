@@ -1,69 +1,117 @@
-# Hermes Agent image
+# Hermes Agent 镜像
 
-This image installs the real Hermes Agent from the official NousResearch/hermes-agent source repository.
+这个目录把官方 [NousResearch/hermes-agent](https://github.com/NousResearch/hermes-agent/) 封装成 Sealos Devbox 可接入的标准镜像。
 
-The install flow in this repo follows the current official setup direction:
+当前实现遵守第一阶段标准：
 
-- install `uv`
-- create a Python 3.11 virtual environment
-- prefer `uv sync --all-extras --locked` when `uv.lock` is present
-- fall back to `uv pip install -e ".[all]"` when lockfile sync is unavailable
-- preserve the base image `/init` entrypoint and pass `/opt/agent/entrypoint.sh` as the container command
+- 固定入口：`entrypoint.sh start`
+- 固定配置入口：`config.sh`
+- 前端 manifest：`/opt/agent/config.json`
+- `config.sh` stdout 固定返回 JSON envelope
+- 不承诺部署时透传任意 Hermes CLI 参数
+- 配置直接落到 Hermes 原生 `~/.hermes/config.yaml` 与 `~/.hermes/.env`
 
-Files in this directory:
+## Upstream Pin
 
-- `Dockerfile`: builds the runtime image from `ghcr.io/gitlayzer/ubuntu:22.04-base`
-- `build.env`: build-time environment values loaded before `install.sh`
-- `install.sh`: installs the Hermes runtime during image build
-- `config.sh`: handles runtime config commands such as `set config ...` and `get config`
-- `config.json`: frontend schema for rendering config actions
-- `entrypoint.sh`: starts the Hermes runtime or dispatches config commands
-- `index.json`: display metadata for frontend rendering
-- `_template/index.yaml`: Kubernetes deployment manifest
+- upstream branch: `main`
+- pinned ref: `ce089169d578b96c82641f17186ba63c288b22d8`
 
-This image is now opinionated for gateway usage: the default startup path is fixed to `hermes gateway`.
+## 运行方式
 
-Run interactive CLI:
+### 默认启动
 
 ```bash
-docker run --rm -it \
-  -v $(pwd)/.hermes:/home/agent/.hermes \
-  agent-hub/hermes:dev
+docker run --rm -p 127.0.0.1:28642:8642 agent-hub/hermes:dev
 ```
 
-Check version:
+等价于：
 
 ```bash
-docker run --rm agent-hub/hermes:dev version
+docker run --rm -p 127.0.0.1:28642:8642 agent-hub/hermes:dev start
 ```
 
-Open a shell inside the image:
+镜像内部固定执行：
+
+```bash
+hermes gateway run
+```
+
+### 调试 shell
 
 ```bash
 docker run --rm -it agent-hub/hermes:dev shell
 ```
 
-Run the gateway explicitly:
+### 原生 CLI 调试
 
 ```bash
-docker run --rm agent-hub/hermes:dev gateway run
+docker run --rm agent-hub/hermes:dev run version
 ```
 
-Example config command:
+## 配置方式
+
+Hermes 这一层不再维护任何仓库私有中间文件，直接使用原生配置：
+
+- `~/.hermes/config.yaml`
+- `~/.hermes/.env`
+
+### 设置主 Provider
 
 ```bash
-docker run --rm -it agent-hub/hermes:dev config set config http://xxx.xxx.xxx/v1 sk-xxxxxxxxxx gpt-5.4
+docker run --rm agent-hub/hermes:dev config provider set-main openai
 ```
 
-The pinned Hermes source ref for this image is `v2026.4.16`.
+自定义 OpenAI-compatible endpoint：
 
-Container startup behavior:
+```bash
+docker run --rm agent-hub/hermes:dev config provider set-main custom http://host.docker.internal:11434/v1
+```
 
-- image `ENTRYPOINT` is `["/init", "/opt/agent/entrypoint.sh"]`
-- image `CMD` is `["gateway"]`
-- API server defaults baked into the image are:
-  - `API_SERVER_ENABLED=true`
-  - `API_SERVER_HOST=0.0.0.0`
-  - `API_SERVER_PORT=8642`
-  - `API_SERVER_KEY=change-me-local-dev`
-- in Kubernetes, pass Hermes CLI arguments through `args`, for example `["gateway"]` or `["gateway", "--help"]`
+命名 provider，例如 ccswitch：
+
+```bash
+docker run --rm agent-hub/hermes:dev config provider set-main ccswitch http://host.docker.internal:15721/v1 chat_completions
+```
+
+这个命令会写入 Hermes 原生 `custom_providers`，并保留 `model.provider = ccswitch`。
+
+### 设置主模型
+
+```bash
+docker run --rm agent-hub/hermes:dev config model set-main gpt-5.4
+```
+
+### 设置凭据或 API Server 相关环境变量
+
+```bash
+docker run --rm agent-hub/hermes:dev config env set OPENAI_API_KEY sk-xxx
+docker run --rm agent-hub/hermes:dev config env set API_SERVER_KEY change-me-local-dev
+```
+
+### 查看当前配置
+
+```bash
+docker run --rm agent-hub/hermes:dev config provider get-main
+docker run --rm agent-hub/hermes:dev config model get-main
+docker run --rm agent-hub/hermes:dev config env list
+```
+
+所有配置命令的 stdout 都是统一 JSON。读取 `.env` 时只返回是否已配置和掩码，不返回密钥明文。
+
+## 本地持久化测试
+
+```bash
+mkdir -p .tmp/hermes-home
+
+docker run -d \
+  --name hermes-local \
+  -p 127.0.0.1:28642:8642 \
+  -v "$PWD/.tmp/hermes-home:/home/agent/.hermes" \
+  agent-hub/hermes:dev
+
+docker exec hermes-local /opt/agent/config.sh provider set-main ccswitch http://host.docker.internal:15721/v1 chat_completions
+docker exec hermes-local /opt/agent/config.sh model set-main gpt-5.4
+docker exec hermes-local /opt/agent/config.sh env set OPENAI_API_KEY sk-local-test
+```
+
+Hermes gateway 是长驻进程，上游会在运行期重新读取 `config.yaml` 与 `.env`，所以配置修改围绕当前运行中的 gateway 生效，而不是依赖重新传启动参数。

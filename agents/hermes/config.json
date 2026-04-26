@@ -1,226 +1,153 @@
 {
-  "script": "agents/hermes/config.sh",
+  "schemaVersion": "devbox-agent-config.v1",
+  "script": "/opt/agent/config.sh",
   "zh": {
     "resources": [
       {
-        "resource": "config",
-        "label": "运行时配置",
-        "description": "写入 .env 和默认模型配置，适合端点、密钥和主模型。",
+        "resource": "provider",
+        "label": "主 Provider",
+        "description": "直接维护 Hermes 原生 model.provider / model.base_url；非内置 provider 会写入 Hermes 原生 custom_providers。",
         "actions": [
           {
-            "action": "set",
-            "label": "设置运行时配置",
+            "action": "set-main",
+            "kind": "write",
+            "label": "设置主 Provider",
             "args": [
               {
-                "name": "endpoint",
-                "label": "Base URL",
-                "type": "text",
-                "required": true,
-                "placeholder": "http://xxx.xxx.xxx/v1"
-              },
-              {
-                "name": "api_key",
-                "label": "API Key",
-                "type": "password",
-                "required": true,
-                "placeholder": "sk-xxxxxxxxxx"
-              },
-              {
-                "name": "model",
-                "label": "模型",
-                "type": "text",
-                "required": false,
-                "default": "gpt-5.4"
-              }
-            ]
-          },
-          {
-            "action": "get",
-            "label": "读取运行时配置",
-            "args": []
-          },
-          {
-            "action": "list",
-            "label": "列出运行时配置",
-            "args": []
-          },
-          {
-            "action": "delete",
-            "label": "删除运行时配置",
-            "args": []
-          }
-        ]
-      },
-      {
-        "resource": "yaml",
-        "label": "config.yaml 配置",
-        "description": "维护 config.values.env、providers.list，并重渲染 config.yaml。",
-        "actions": [
-          {
-            "action": "set",
-            "label": "设置 YAML 标量字段",
-            "args": [
-              {
-                "name": "key",
-                "label": "配置项",
-                "type": "select",
-                "required": true,
-                "options": [
-                  "model",
-                  "provider",
-                  "terminal.backend",
-                  "display.skin"
-                ]
-              },
-              {
-                "name": "value",
-                "label": "值",
-                "type": "text",
-                "required": true
-              }
-            ]
-          },
-          {
-            "action": "get",
-            "label": "读取 YAML 字段",
-            "args": [
-              {
-                "name": "key",
-                "label": "配置项",
-                "type": "select",
-                "required": true,
-                "options": [
-                  "model",
-                  "provider",
-                  "terminal.backend",
-                  "display.skin",
-                  "fallback_providers"
-                ]
-              }
-            ]
-          },
-          {
-            "action": "delete",
-            "label": "删除 YAML 字段",
-            "args": [
-              {
-                "name": "key",
-                "label": "配置项",
-                "type": "select",
-                "required": true,
-                "options": [
-                  "model",
-                  "provider",
-                  "terminal.backend",
-                  "display.skin",
-                  "fallback_providers"
-                ]
-              }
-            ]
-          },
-          {
-            "action": "list",
-            "label": "查看完整 YAML",
-            "args": []
-          },
-          {
-            "action": "render",
-            "label": "重渲染 config.yaml",
-            "args": []
-          },
-          {
-            "action": "add",
-            "label": "添加 fallback provider",
-            "args": [
-              {
-                "name": "key",
-                "label": "目标项",
-                "type": "fixed",
-                "required": true,
-                "value": "fallback_providers"
-              },
-              {
-                "name": "value",
+                "name": "provider",
                 "label": "Provider",
                 "type": "text",
                 "required": true,
-                "placeholder": "openai"
-              }
-            ]
-          },
-          {
-            "action": "remove",
-            "label": "移除 fallback provider",
-            "args": [
-              {
-                "name": "key",
-                "label": "目标项",
-                "type": "fixed",
-                "required": true,
-                "value": "fallback_providers"
-              },
-              {
-                "name": "value",
-                "label": "Provider",
-                "type": "text",
-                "required": true,
-                "placeholder": "openai"
-              }
-            ]
-          },
-          {
-            "action": "add",
-            "label": "添加 provider",
-            "args": [
-              {
-                "name": "key",
-                "label": "目标项",
-                "type": "fixed",
-                "required": true,
-                "value": "provider"
-              },
-              {
-                "name": "name",
-                "label": "Provider 名称",
-                "type": "text",
-                "required": true,
-                "placeholder": "custom"
+                "placeholder": "openai / openrouter / anthropic / custom / ccswitch"
               },
               {
                 "name": "base_url",
                 "label": "Base URL",
                 "type": "text",
                 "required": false,
-                "placeholder": "http://xxx.xxx.xxx/v1"
+                "placeholder": "http://host/v1"
               },
               {
-                "name": "api_key_env",
-                "label": "API Key 环境变量",
-                "type": "text",
+                "name": "api_mode",
+                "label": "API 模式",
+                "type": "select",
                 "required": false,
-                "default": "OPENAI_API_KEY"
+                "options": [
+                  { "label": "Chat Completions", "value": "chat_completions" },
+                  { "label": "Codex Responses", "value": "codex_responses" },
+                  { "label": "Anthropic Messages", "value": "anthropic_messages" }
+                ],
+                "placeholder": "chat_completions"
               }
             ]
           },
           {
-            "action": "remove",
-            "label": "移除 provider",
+            "action": "get-main",
+            "kind": "read",
+            "label": "读取主 Provider",
+            "args": []
+          },
+          {
+            "action": "delete-main",
+            "kind": "delete",
+            "label": "清理 Provider 覆盖",
+            "args": []
+          }
+        ]
+      },
+      {
+        "resource": "model",
+        "label": "主模型",
+        "description": "直接维护 Hermes 原生 model.default。",
+        "actions": [
+          {
+            "action": "set-main",
+            "kind": "write",
+            "label": "设置主模型",
+            "args": [
+              {
+                "name": "model",
+                "label": "模型",
+                "type": "text",
+                "required": true,
+                "placeholder": "gpt-5.4"
+              }
+            ]
+          },
+          {
+            "action": "get-main",
+            "kind": "read",
+            "label": "读取主模型",
+            "args": []
+          },
+          {
+            "action": "delete-main",
+            "kind": "delete",
+            "label": "清理主模型覆盖",
+            "args": []
+          }
+        ]
+      },
+      {
+        "resource": "env",
+        "label": ".env",
+        "description": "直接维护 Hermes 原生 ~/.hermes/.env，例如 OPENAI_API_KEY、OPENROUTER_API_KEY、API_SERVER_KEY。读取动作只返回是否已配置，不返回明文。",
+        "actions": [
+          {
+            "action": "set",
+            "kind": "write",
+            "label": "设置环境变量",
             "args": [
               {
                 "name": "key",
-                "label": "目标项",
-                "type": "fixed",
-                "required": true,
-                "value": "provider"
-              },
-              {
-                "name": "name",
-                "label": "Provider 名称",
+                "label": "键",
                 "type": "text",
                 "required": true,
-                "placeholder": "custom"
+                "placeholder": "OPENAI_API_KEY"
+              },
+              {
+                "name": "value",
+                "label": "值",
+                "type": "password",
+                "required": false,
+                "placeholder": "sk-...",
+                "sensitive": true
               }
             ]
+          },
+          {
+            "action": "get",
+            "kind": "read",
+            "label": "读取环境变量状态",
+            "args": [
+              {
+                "name": "key",
+                "label": "键",
+                "type": "text",
+                "required": true,
+                "placeholder": "OPENAI_API_KEY"
+              }
+            ]
+          },
+          {
+            "action": "delete",
+            "kind": "delete",
+            "label": "删除环境变量",
+            "args": [
+              {
+                "name": "key",
+                "label": "键",
+                "type": "text",
+                "required": true,
+                "placeholder": "OPENAI_API_KEY"
+              }
+            ]
+          },
+          {
+            "action": "list",
+            "kind": "read",
+            "label": "列出 .env 配置状态",
+            "args": []
           }
         ]
       }
@@ -229,224 +156,150 @@
   "en": {
     "resources": [
       {
-        "resource": "config",
-        "label": "Runtime Config",
-        "description": "Writes .env values and the default model configuration, suitable for endpoints, secrets, and the primary model.",
+        "resource": "provider",
+        "label": "Main Provider",
+        "description": "Manage Hermes native model.provider / model.base_url directly. Non-built-in providers are stored in Hermes native custom_providers.",
         "actions": [
           {
-            "action": "set",
-            "label": "Set Runtime Config",
+            "action": "set-main",
+            "kind": "write",
+            "label": "Set Main Provider",
             "args": [
               {
-                "name": "endpoint",
-                "label": "Base URL",
-                "type": "text",
-                "required": true,
-                "placeholder": "http://xxx.xxx.xxx/v1"
-              },
-              {
-                "name": "api_key",
-                "label": "API Key",
-                "type": "password",
-                "required": true,
-                "placeholder": "sk-xxxxxxxxxx"
-              },
-              {
-                "name": "model",
-                "label": "Model",
-                "type": "text",
-                "required": false,
-                "default": "gpt-5.4"
-              }
-            ]
-          },
-          {
-            "action": "get",
-            "label": "Get Runtime Config",
-            "args": []
-          },
-          {
-            "action": "list",
-            "label": "List Runtime Config",
-            "args": []
-          },
-          {
-            "action": "delete",
-            "label": "Delete Runtime Config",
-            "args": []
-          }
-        ]
-      },
-      {
-        "resource": "yaml",
-        "label": "config.yaml Config",
-        "description": "Maintains config.values.env and providers.list, then re-renders config.yaml.",
-        "actions": [
-          {
-            "action": "set",
-            "label": "Set YAML Scalar Field",
-            "args": [
-              {
-                "name": "key",
-                "label": "Key",
-                "type": "select",
-                "required": true,
-                "options": [
-                  "model",
-                  "provider",
-                  "terminal.backend",
-                  "display.skin"
-                ]
-              },
-              {
-                "name": "value",
-                "label": "Value",
-                "type": "text",
-                "required": true
-              }
-            ]
-          },
-          {
-            "action": "get",
-            "label": "Get YAML Field",
-            "args": [
-              {
-                "name": "key",
-                "label": "Key",
-                "type": "select",
-                "required": true,
-                "options": [
-                  "model",
-                  "provider",
-                  "terminal.backend",
-                  "display.skin",
-                  "fallback_providers"
-                ]
-              }
-            ]
-          },
-          {
-            "action": "delete",
-            "label": "Delete YAML Field",
-            "args": [
-              {
-                "name": "key",
-                "label": "Key",
-                "type": "select",
-                "required": true,
-                "options": [
-                  "model",
-                  "provider",
-                  "terminal.backend",
-                  "display.skin",
-                  "fallback_providers"
-                ]
-              }
-            ]
-          },
-          {
-            "action": "list",
-            "label": "Show Full YAML",
-            "args": []
-          },
-          {
-            "action": "render",
-            "label": "Re-render config.yaml",
-            "args": []
-          },
-          {
-            "action": "add",
-            "label": "Add Fallback Provider",
-            "args": [
-              {
-                "name": "key",
-                "label": "Target",
-                "type": "fixed",
-                "required": true,
-                "value": "fallback_providers"
-              },
-              {
-                "name": "value",
+                "name": "provider",
                 "label": "Provider",
                 "type": "text",
                 "required": true,
-                "placeholder": "openai"
-              }
-            ]
-          },
-          {
-            "action": "remove",
-            "label": "Remove Fallback Provider",
-            "args": [
-              {
-                "name": "key",
-                "label": "Target",
-                "type": "fixed",
-                "required": true,
-                "value": "fallback_providers"
-              },
-              {
-                "name": "value",
-                "label": "Provider",
-                "type": "text",
-                "required": true,
-                "placeholder": "openai"
-              }
-            ]
-          },
-          {
-            "action": "add",
-            "label": "Add Provider",
-            "args": [
-              {
-                "name": "key",
-                "label": "Target",
-                "type": "fixed",
-                "required": true,
-                "value": "provider"
-              },
-              {
-                "name": "name",
-                "label": "Provider Name",
-                "type": "text",
-                "required": true,
-                "placeholder": "custom"
+                "placeholder": "openai / openrouter / anthropic / custom / ccswitch"
               },
               {
                 "name": "base_url",
                 "label": "Base URL",
                 "type": "text",
                 "required": false,
-                "placeholder": "http://xxx.xxx.xxx/v1"
+                "placeholder": "http://host/v1"
               },
               {
-                "name": "api_key_env",
-                "label": "API Key Env",
-                "type": "text",
+                "name": "api_mode",
+                "label": "API Mode",
+                "type": "select",
                 "required": false,
-                "default": "OPENAI_API_KEY"
+                "options": [
+                  { "label": "Chat Completions", "value": "chat_completions" },
+                  { "label": "Codex Responses", "value": "codex_responses" },
+                  { "label": "Anthropic Messages", "value": "anthropic_messages" }
+                ],
+                "placeholder": "chat_completions"
               }
             ]
           },
           {
-            "action": "remove",
-            "label": "Remove Provider",
+            "action": "get-main",
+            "kind": "read",
+            "label": "Get Main Provider",
+            "args": []
+          },
+          {
+            "action": "delete-main",
+            "kind": "delete",
+            "label": "Clear Provider Override",
+            "args": []
+          }
+        ]
+      },
+      {
+        "resource": "model",
+        "label": "Main Model",
+        "description": "Manage Hermes native model.default directly.",
+        "actions": [
+          {
+            "action": "set-main",
+            "kind": "write",
+            "label": "Set Main Model",
+            "args": [
+              {
+                "name": "model",
+                "label": "Model",
+                "type": "text",
+                "required": true,
+                "placeholder": "gpt-5.4"
+              }
+            ]
+          },
+          {
+            "action": "get-main",
+            "kind": "read",
+            "label": "Get Main Model",
+            "args": []
+          },
+          {
+            "action": "delete-main",
+            "kind": "delete",
+            "label": "Clear Model Override",
+            "args": []
+          }
+        ]
+      },
+      {
+        "resource": "env",
+        "label": ".env",
+        "description": "Manage Hermes native ~/.hermes/.env directly. Read actions only return configured status, never secret plaintext.",
+        "actions": [
+          {
+            "action": "set",
+            "kind": "write",
+            "label": "Set Env Var",
             "args": [
               {
                 "name": "key",
-                "label": "Target",
-                "type": "fixed",
-                "required": true,
-                "value": "provider"
-              },
-              {
-                "name": "name",
-                "label": "Provider Name",
+                "label": "Key",
                 "type": "text",
                 "required": true,
-                "placeholder": "custom"
+                "placeholder": "OPENAI_API_KEY"
+              },
+              {
+                "name": "value",
+                "label": "Value",
+                "type": "password",
+                "required": false,
+                "placeholder": "sk-...",
+                "sensitive": true
               }
             ]
+          },
+          {
+            "action": "get",
+            "kind": "read",
+            "label": "Get Env Var Status",
+            "args": [
+              {
+                "name": "key",
+                "label": "Key",
+                "type": "text",
+                "required": true,
+                "placeholder": "OPENAI_API_KEY"
+              }
+            ]
+          },
+          {
+            "action": "delete",
+            "kind": "delete",
+            "label": "Delete Env Var",
+            "args": [
+              {
+                "name": "key",
+                "label": "Key",
+                "type": "text",
+                "required": true,
+                "placeholder": "OPENAI_API_KEY"
+              }
+            ]
+          },
+          {
+            "action": "list",
+            "kind": "read",
+            "label": "List .env Status",
+            "args": []
           }
         ]
       }

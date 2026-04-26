@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-AGENT_NAME="${AGENT_NAME:-hermes}"
-HERMES_HOME="${HERMES_HOME:-/home/agent/.hermes}"
-HERMES_VENV="${HERMES_VENV:-/opt/hermes/venv}"
-PATH="${HERMES_VENV}/bin:${PATH}"
+AGENT_NAME="${AGENT_NAME:-openclaw}"
+OPENCLAW_STATE_DIR="${OPENCLAW_STATE_DIR:-/home/agent/.openclaw}"
+OPENCLAW_CONFIG_PATH="${OPENCLAW_CONFIG_PATH:-${OPENCLAW_STATE_DIR}/openclaw.json}"
+OPENCLAW_WORKSPACE="${OPENCLAW_WORKSPACE:-/workspace}"
+PATH="/usr/local/bin:${PATH}"
 
 # shellcheck disable=SC1091
 source /opt/agent/config.sh
@@ -17,31 +18,28 @@ fail() {
 run_as_agent() {
   exec runuser -u agent -- env \
     HOME=/home/agent \
-    HERMES_HOME="$HERMES_HOME" \
-    HERMES_VENV="$HERMES_VENV" \
+    OPENCLAW_STATE_DIR="$OPENCLAW_STATE_DIR" \
+    OPENCLAW_CONFIG_PATH="$OPENCLAW_CONFIG_PATH" \
+    OPENCLAW_WORKSPACE="$OPENCLAW_WORKSPACE" \
     PATH="$PATH" \
-    API_SERVER_ENABLED="${API_SERVER_ENABLED:-}" \
-    API_SERVER_HOST="${API_SERVER_HOST:-}" \
-    API_SERVER_PORT="${API_SERVER_PORT:-}" \
-    API_SERVER_KEY="${API_SERVER_KEY:-}" \
     "$@"
 }
 
 start_agent() {
-  [[ "$#" -eq 0 ]] || fail "hermes start does not accept extra arguments in phase 1"
-  run_as_agent hermes gateway run
+  [[ "$#" -eq 0 ]] || fail "openclaw start does not accept extra arguments in phase 1"
+  run_as_agent env OPENCLAW_NO_RESPAWN=1 openclaw gateway run
 }
 
 run_agent_cli() {
-  [[ "$#" -gt 0 ]] || fail "hermes run requires native CLI arguments"
-  run_as_agent hermes "$@"
+  [[ "$#" -gt 0 ]] || fail "openclaw run requires native CLI arguments"
+  run_as_agent openclaw "$@"
 }
 
 main() {
   local command="${1:-start}"
   shift || true
 
-  ensure_hermes_state
+  ensure_openclaw_state
 
   case "$command" in
     start)

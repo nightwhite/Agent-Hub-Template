@@ -2,18 +2,21 @@
   "id": "hermes",
   "icon": "https://github.com/NousResearch/hermes-agent/blob/main/assets/banner.png?raw=true",
   "name": "Hermes",
-  "desc": "Terminal-first Hermes runtime image built from upstream source.",
-  "version": "v2026.4.16",
+  "desc": "Hermes adapter for Sealos Devbox with fixed start/config contracts.",
+  "version": "main-ce089169",
   "status": "enabled",
   "image": "agent-hub/hermes:dev",
   "base_image": "ghcr.io/gitlayzer/ubuntu:22.04-base",
   "category": "platform-agent",
   "repo_path": "agents/hermes",
   "readme": "agents/hermes/README.md",
+  "runtime": {
+    "kind": "service"
+  },
   "tags": [
-    "cli",
     "python",
-    "mcp",
-    "web"
+    "gateway",
+    "provider-native",
+    "devbox"
   ]
 }

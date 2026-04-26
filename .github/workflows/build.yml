@@ -22,6 +22,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Validate agent contracts
+        run: bash test/validate-agent-contract.sh
+
       - name: Generate agent matrix from registry
         id: matrix
         run: |
