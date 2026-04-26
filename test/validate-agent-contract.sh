@@ -129,6 +129,54 @@ if kind not in {"service", "tool"}:
 PY
 }
 
+validate_dockerfile_contract() {
+  local file="$1"
+
+  grep -Eq '^[[:space:]]*ENTRYPOINT[[:space:]]+\[[[:space:]]*"/init"[[:space:]]*,[[:space:]]*"/opt/agent/entrypoint.sh"[[:space:]]*\]' "$file" || \
+    fail "$file must keep the /init entrypoint"
+  grep -Eq '^[[:space:]]*CMD[[:space:]]+\[[[:space:]]*"start"[[:space:]]*\]' "$file" || \
+    fail "$file must default CMD to start"
+  grep -Eq '^[[:space:]]*COPY([[:space:]]+--[^[:space:]]+)*[[:space:]]+.*config\.json[[:space:]]+/opt/agent/config\.json([[:space:]]|$)' "$file" || \
+    fail "$file must copy config.json to /opt/agent/config.json"
+}
+
+validate_deploy_contract() {
+  local file="$1"
+  if python3 -c 'import yaml' >/dev/null 2>&1; then
+    python3 - "$file" <<'PY'
+import sys
+from pathlib import Path
+import yaml
+
+path = Path(sys.argv[1])
+data = yaml.safe_load(path.read_text(encoding="utf-8"))
+containers = (
+    data.get("spec", {})
+    .get("template", {})
+    .get("spec", {})
+    .get("containers", [])
+)
+if not any(container.get("args") == ["start"] for container in containers if isinstance(container, dict)):
+    raise SystemExit(f'{path}: deploy container args must be ["start"]')
+PY
+    return
+  fi
+
+  if command -v ruby >/dev/null 2>&1; then
+    ruby -e '
+      require "yaml"
+      path = ARGV[0]
+      data = YAML.safe_load(File.read(path), permitted_classes: [], permitted_symbols: [], aliases: true)
+      containers = data.dig("spec", "template", "spec", "containers") || []
+      ok = containers.any? { |container| container.is_a?(Hash) && container["args"] == ["start"] }
+      abort("#{path}: deploy container args must be [\"start\"]") unless ok
+    ' "$file"
+    return
+  fi
+
+  fail "python3 with PyYAML or ruby is required to validate deploy contract: $file"
+}
+
 for agent_dir in "${agents[@]}"; do
   [[ -d "$agent_dir" ]] || fail "agent directory not found: $agent_dir"
   printf '==> validating %s\n' "$agent_dir"
@@ -145,15 +193,9 @@ for agent_dir in "${agents[@]}"; do
   validate_yaml_file "$agent_dir/deploy.yaml"
   validate_manifest "$agent_dir"
   validate_index "$agent_dir"
+  validate_dockerfile_contract "$agent_dir/Dockerfile"
+  validate_deploy_contract "$agent_dir/deploy.yaml"
 
-  grep -F 'ENTRYPOINT ["/init", "/opt/agent/entrypoint.sh"]' "$agent_dir/Dockerfile" >/dev/null || \
-    fail "$agent_dir/Dockerfile must keep the /init entrypoint"
-  grep -F 'CMD ["start"]' "$agent_dir/Dockerfile" >/dev/null || \
-    fail "$agent_dir/Dockerfile must default CMD to start"
-  grep -F 'config.json /opt/agent/config.json' "$agent_dir/Dockerfile" >/dev/null || \
-    fail "$agent_dir/Dockerfile must copy config.json to /opt/agent/config.json"
-  grep -F 'args: ["start"]' "$agent_dir/deploy.yaml" >/dev/null || \
-    fail "$agent_dir/deploy.yaml must keep args: [\"start\"]"
   grep -F 'json_success' "$agent_dir/config.sh" >/dev/null || \
     fail "$agent_dir/config.sh must emit JSON success envelopes"
   grep -F 'json_error' "$agent_dir/config.sh" >/dev/null || \
