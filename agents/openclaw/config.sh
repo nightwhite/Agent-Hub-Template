@@ -194,7 +194,12 @@ const profileId = profileArg || `${provider}:default`;
 const emptyStore = () => ({ version: 1, profiles: {} });
 const readStore = () => {
   if (!fs.existsSync(file)) return emptyStore();
-  const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
+  let parsed;
+  try {
+    parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
+  } catch {
+    return emptyStore();
+  }
   if (!parsed || typeof parsed !== 'object') return emptyStore();
   if (!parsed.profiles || typeof parsed.profiles !== 'object') parsed.profiles = {};
   if (!Number.isFinite(Number(parsed.version))) parsed.version = 1;

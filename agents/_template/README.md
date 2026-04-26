@@ -4,7 +4,7 @@
 
 这个目录只提供第一阶段接入骨架，不提供统一配置 schema。
 
-## 模板强调的只有四件事
+## 模板强调的只有五件事
 
 - 镜像必须基于 Devbox base，并保留 `/init`
 - `entrypoint.sh` 统一暴露 `start/config/shell/run`

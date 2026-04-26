@@ -11,6 +11,7 @@ log() {
 }
 
 json_quote() {
+  # Template helper only. Swap this for the agent's native runtime if Python is not installed.
   python3 -c 'import json, sys; print(json.dumps(sys.argv[1], ensure_ascii=False))' "${1-}"
 }
 
