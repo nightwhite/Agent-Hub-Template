@@ -14,8 +14,9 @@
 
 ## Upstream Pin
 
-- npm package: `openclaw@2026.4.22`
-- reference repo head used for study: `12de62bfd831eac9ce4a1087542ab6a1ef02d120`
+- npm package: `openclaw@2026.4.24`
+- reference repo head used for study: `3b5463591be93c676a074134c5e384f8024a6945`
+- reference repo package version: `2026.4.26` (not published to npm at the time of this adapter update)
 
 ## 运行方式
 
@@ -55,8 +56,9 @@ OpenClaw 这一层直接使用原生配置：
 
 - `~/.openclaw/openclaw.json`
 - `~/.openclaw/.env`
-- `~/.openclaw/agents/main/agent/auth-profiles.json`
+- `/opt/openclaw/plugin-runtime-deps` for OpenClaw bundled plugin runtime deps
 - `openclaw config set/get/unset`
+- Gateway RPC `config.get` + `config.patch` when a gateway is already running
 
 ### 设置主模型
 
@@ -82,7 +84,7 @@ docker run --rm agent-hub/openclaw:dev config provider set ccswitch http://host.
 docker run --rm agent-hub/openclaw:dev config provider set-api-key ccswitch sk-xxx
 ```
 
-如果 gateway 已经在运行，这个动作会在写入 `auth-profiles.json` 后调用 OpenClaw 原生 `secrets reload`，让当前运行态立即使用新 key。
+如果 gateway 已经在运行，这个动作会通过 OpenClaw 原生 Gateway RPC `config.patch` 写入 `models.providers.<id>.apiKey`，等待 gateway 重新 ready 后才返回 `applied=true`。stdout 只返回是否已配置和掩码，不返回密钥明文。
 
 ### 设置 Gateway 本地模式
 
@@ -132,4 +134,6 @@ docker exec openclaw-local /opt/agent/config.sh model set-main ccswitch gpt-5.4-
 docker exec openclaw-local /opt/agent/config.sh provider set-api-key ccswitch sk-local-test
 ```
 
-容器默认把 `gateway.bind` 固定为 `lan`，这样 `docker run -p ...` 后宿主机可以直接访问 published port。运行中的 gateway 使用 upstream 原生 config reload；provider secret 更新后 adapter 会触发 upstream 原生 secrets reload。这里额外设置 `OPENCLAW_NO_RESPAWN=1`，避免 `docker run` 场景下需要 full-process restart 的配置变更直接让容器退出。
+容器默认把 `gateway.bind` 固定为 `lan`，这样 `docker run -p ...` 后宿主机可以直接访问 published port。运行中的 gateway 使用 upstream 原生 `config.patch` 触发配置写入与运行态刷新。这里额外设置 `OPENCLAW_NO_RESPAWN=1`，避免 `docker run` 场景下需要 full-process restart 的配置变更直接让容器退出；默认设置 `OPENCLAW_SKIP_CHANNELS=1`，沿用 upstream dev/live-test 入口，避免容器网络里启动 Telegram 等频道 sidecar；默认设置 `OPENCLAW_DISABLE_BONJOUR=1`，沿用 upstream Docker 建议，避免 Docker bridge 网络里的 mDNS 探测导致 gateway 不稳定。
+
+默认原生配置会禁用 `acpx`、`bonjour`、`browser` 这几个 bundled sidecar 插件。第一阶段 Devbox adapter 只验收 gateway、模型 provider、配置热更新和 inference 链路；不默认打开 OpenClaw 桌面/频道发现能力，避免本地 Docker 与 Devbox 容器网络里出现非核心 sidecar 阻塞或重启。

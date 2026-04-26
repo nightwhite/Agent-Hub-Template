@@ -9,7 +9,7 @@ ARG ALL_PROXY
 ARG no_proxy
 ARG NO_PROXY
 
-ENV AGENT_NAME=hermes \
+ENV AGENT_NAME=hermes-agent \
     AGENT_RUNTIME_KIND=service \
     HERMES_HOME=/home/agent/.hermes \
     HERMES_SRC=/opt/hermes/src \
@@ -20,8 +20,8 @@ ENV AGENT_NAME=hermes \
     API_SERVER_KEY=change-me-local-dev \
     PATH=/opt/hermes/venv/bin:$PATH
 
-COPY agents/hermes/build.env /tmp/build.env
-COPY agents/hermes/install.sh /tmp/install.sh
+COPY agents/hermes-agent/build.env /tmp/build.env
+COPY agents/hermes-agent/install.sh /tmp/install.sh
 RUN chmod +x /tmp/install.sh \
     && set -a \
     && . /tmp/build.env \
@@ -29,9 +29,9 @@ RUN chmod +x /tmp/install.sh \
     && /tmp/install.sh install \
     && rm -f /tmp/build.env /tmp/install.sh
 
-COPY agents/hermes/config.json /opt/agent/config.json
-COPY agents/hermes/config.sh /opt/agent/config.sh
-COPY agents/hermes/entrypoint.sh /opt/agent/entrypoint.sh
+COPY agents/hermes-agent/config.json /opt/agent/config.json
+COPY agents/hermes-agent/config.sh /opt/agent/config.sh
+COPY agents/hermes-agent/entrypoint.sh /opt/agent/entrypoint.sh
 RUN getent group agent >/dev/null || groupadd --gid 10001 agent \
     && id -u agent >/dev/null 2>&1 || useradd --uid 10001 --gid 10001 --create-home --shell /bin/bash agent \
     && chmod +x /opt/agent/config.sh /opt/agent/entrypoint.sh \

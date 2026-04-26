@@ -1,6 +1,6 @@
 # Hermes 本地测试
 
-这份文档对应当前仓库里的 `agents/hermes` 第一阶段接入实现。
+这份文档对应当前仓库里的 `agents/hermes-agent` 第一阶段接入实现。
 
 目标是验证五件事：
 
@@ -13,10 +13,10 @@
 ## 1. 语法检查
 
 ```bash
-bash -n agents/hermes/install.sh
-bash -n agents/hermes/entrypoint.sh
-bash -n agents/hermes/config.sh
-bash test/validate-agent-contract.sh agents/hermes
+bash -n agents/hermes-agent/install.sh
+bash -n agents/hermes-agent/entrypoint.sh
+bash -n agents/hermes-agent/config.sh
+bash test/validate-agent-contract.sh agents/hermes-agent
 ```
 
 预期：无输出，退出码为 `0`。
@@ -24,7 +24,7 @@ bash test/validate-agent-contract.sh agents/hermes
 ## 2. 构建镜像
 
 ```bash
-docker build -f agents/hermes/Dockerfile -t agent-hub/hermes:local .
+docker build -f agents/hermes-agent/Dockerfile -t agent-hub/hermes-agent:local .
 ```
 
 ## 3. 以前台 gateway 方式启动
@@ -35,7 +35,7 @@ docker rm -f hermes-local 2>/dev/null || true
 docker run -d \
   --name hermes-local \
   -p 127.0.0.1:28642:8642 \
-  agent-hub/hermes:local
+  agent-hub/hermes-agent:local
 ```
 
 这里不再传 `gateway` 参数。默认 `CMD` 已经固定为 `start`，容器内部会执行：
@@ -61,13 +61,13 @@ docker logs --tail 120 hermes-local
 ### `shell`
 
 ```bash
-docker run --rm -it agent-hub/hermes:local shell
+docker run --rm -it agent-hub/hermes-agent:local shell
 ```
 
 ### `run`
 
 ```bash
-docker run --rm agent-hub/hermes:local run version
+docker run --rm agent-hub/hermes-agent:local run version
 ```
 
 ## 5. 运行中配置 Hermes
@@ -75,7 +75,7 @@ docker run --rm agent-hub/hermes:local run version
 ### 设置主 Provider
 
 ```bash
-docker exec hermes-local /opt/agent/config.sh provider set-main ccswitch http://host.docker.internal:15721/v1 chat_completions
+docker exec hermes-local /opt/agent/config.sh provider set-main ccswitch http://host.docker.internal:15721/v1 chat_completions CCSWITCH_API_KEY
 ```
 
 预期 stdout 是 JSON：
@@ -99,7 +99,7 @@ docker exec hermes-local /opt/agent/config.sh model set-main gpt-5.4
 ### 设置凭据
 
 ```bash
-docker exec hermes-local /opt/agent/config.sh env set OPENAI_API_KEY sk-local-test
+docker exec hermes-local /opt/agent/config.sh env set CCSWITCH_API_KEY sk-local-test
 ```
 
 ### 读取配置
@@ -121,8 +121,8 @@ docker exec hermes-local cat /home/agent/.hermes/.env
 
 这里应该能直接看到：
 
-- `config.yaml` 中的 `model.provider` / `custom_providers` / `model.default`
-- `.env` 中的 `OPENAI_API_KEY`
+- `config.yaml` 中的 `model.provider` / `providers` / `model.default`
+- `.env` 中的 `CCSWITCH_API_KEY`
 
 ## 7. 验证 API Server 监听
 

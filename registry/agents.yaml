@@ -1,6 +1,6 @@
 agents:
-  - name: hermes
-    path: agents/hermes
+  - name: hermes-agent
+    path: agents/hermes-agent
     enabled: false
   - name: openclaw
     path: agents/openclaw

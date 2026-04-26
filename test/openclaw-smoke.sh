@@ -59,13 +59,13 @@ assert payload["error"].get("message"), payload
 '
 }
 
-assert_runtime_reload_applied() {
+assert_runtime_config_applied() {
   local output="$1"
   printf '%s' "$output" | python3 -c 'import json, sys
 payload = json.load(sys.stdin)
-runtime_reload = payload.get("data", {}).get("runtimeReload", {})
-assert runtime_reload.get("applied") is True, payload
-assert runtime_reload.get("skipped") is False, payload
+runtime_apply = payload.get("data", {}).get("runtimeApply", {})
+assert runtime_apply.get("applied") is True, payload
+assert runtime_apply.get("skipped") is False, payload
 '
 }
 
@@ -87,15 +87,24 @@ import sys
 
 path, expected_model = sys.argv[1], sys.argv[2]
 payload = json.loads(open(path, encoding="utf-8").read())
+if payload.get("transport") == "gateway":
+    outputs = payload.get("outputs", [])
+    provider = payload.get("provider")
+    model = payload.get("model")
+else:
+    result = payload.get("result", {})
+    outputs = result.get("payloads", [])
+    agent_meta = result.get("meta", {}).get("agentMeta", {})
+    provider = agent_meta.get("provider")
+    model = agent_meta.get("model")
 texts = [
     item.get("text")
-    for item in payload.get("outputs", [])
+    for item in outputs
     if isinstance(item, dict) and item.get("text")
 ]
 text = payload.get("output") or payload.get("text") or payload.get("content") or " ".join(texts)
-assert payload.get("transport") == "gateway", payload
-assert payload.get("provider") == "ccswitch", payload
-assert payload.get("model") == expected_model, payload
+assert provider == "ccswitch", payload
+assert model == expected_model, payload
 assert text, payload
 PY
 }
@@ -120,23 +129,31 @@ run_openclaw_gateway_infer() {
   python3 - "$CONTAINER" "$output_file" "$OPENCLAW_INFER_TIMEOUT_SECONDS" "$CCSWITCH_MODEL" <<'PY'
 import subprocess
 import sys
+import uuid
 
 container, output_file, timeout_seconds, model = sys.argv[1], sys.argv[2], int(sys.argv[3]), sys.argv[4]
+params = {
+    "agentId": "main",
+    "message": "Reply with exactly: pong",
+    "provider": "ccswitch",
+    "model": model,
+    "idempotencyKey": f"openclaw-smoke-{uuid.uuid4().hex}",
+}
 cmd = [
     "docker",
     "exec",
     container,
     "/opt/agent/entrypoint.sh",
     "run",
-    "infer",
-    "model",
-    "run",
-    "--gateway",
+    "gateway",
+    "call",
+    "agent",
+    "--expect-final",
+    "--timeout",
+    str(timeout_seconds * 1000),
     "--json",
-    "--model",
-    f"ccswitch/{model}",
-    "--prompt",
-    "Reply with exactly: pong",
+    "--params",
+    __import__("json").dumps(params),
 ]
 with open(output_file, "wb") as output:
     completed = subprocess.run(cmd, stdout=output, stderr=subprocess.PIPE, timeout=timeout_seconds)
@@ -195,16 +212,16 @@ docker run -d \
   "${docker_proxy_env[@]+"${docker_proxy_env[@]}"}" \
   "$IMAGE" >/dev/null
 
-printf '==> waiting for OpenClaw health endpoint\n'
+printf '==> waiting for OpenClaw readiness endpoint\n'
 ready=0
 for _ in $(seq 1 90); do
-  if curl --noproxy '*' -fsS --max-time 2 "http://127.0.0.1:${HOST_PORT}/healthz" >/dev/null 2>&1; then
+  if curl --noproxy '*' -fsS --max-time 2 "http://127.0.0.1:${HOST_PORT}/readyz" >/dev/null 2>&1; then
     ready=1
     break
   fi
   sleep 2
 done
-[[ "$ready" -eq 1 ]] || fail "OpenClaw health endpoint did not become ready"
+[[ "$ready" -eq 1 ]] || fail "OpenClaw readiness endpoint did not become ready"
 
 printf '==> checking runtime manifest and standard entrypoints\n'
 docker exec "$CONTAINER" cat /opt/agent/config.json | python3 -m json.tool >/dev/null
@@ -221,7 +238,7 @@ runtime_output="$(run_config_json model set-main ccswitch "$CCSWITCH_MODEL")"
 assert_runtime_apply_applied "$runtime_output"
 secret_output="$(run_config_json provider set-api-key ccswitch "$CCSWITCH_API_KEY")"
 [[ "$secret_output" != *"$CCSWITCH_API_KEY"* ]] || fail "secret value leaked in provider set-api-key output"
-assert_runtime_reload_applied "$secret_output"
+assert_runtime_config_applied "$secret_output"
 secret_output="$(run_config_json env set OPENAI_API_KEY "$CCSWITCH_API_KEY")"
 [[ "$secret_output" != *"$CCSWITCH_API_KEY"* ]] || fail "secret value leaked in env set output"
 run_config_json provider get ccswitch >/dev/null
@@ -235,25 +252,20 @@ expect_config_error model set-main
 
 printf '==> verifying config files\n'
 openclaw_config_file="$(mktemp)"
-openclaw_auth_file="$(mktemp)"
 docker exec "$CONTAINER" cat /home/agent/.openclaw/openclaw.json >"$openclaw_config_file"
-docker exec "$CONTAINER" cat /home/agent/.openclaw/agents/main/agent/auth-profiles.json >"$openclaw_auth_file"
-python3 - "$openclaw_config_file" "$openclaw_auth_file" "$CCSWITCH_MODEL" "$CCSWITCH_CONTAINER_BASE_URL" <<'PY'
+python3 - "$openclaw_config_file" "$CCSWITCH_MODEL" "$CCSWITCH_CONTAINER_BASE_URL" "$CCSWITCH_API_KEY" <<'PY'
 import json
 import sys
 
-config_path, auth_path, expected_model, expected_base_url = sys.argv[1:]
+config_path, expected_model, expected_base_url, expected_api_key = sys.argv[1:]
 config = json.load(open(config_path, encoding="utf-8"))
-auth = json.load(open(auth_path, encoding="utf-8"))
 assert config["agents"]["defaults"]["model"]["primary"] == f"ccswitch/{expected_model}", config
 provider = config["models"]["providers"]["ccswitch"]
 assert provider["baseUrl"] == expected_base_url, provider
 assert provider["api"] == "openai-completions", provider
-profile = auth["profiles"]["ccswitch:default"]
-assert profile["type"] == "api_key", profile
-assert profile["provider"] == "ccswitch", profile
+assert provider["apiKey"] == expected_api_key, provider
 PY
-rm -f "$openclaw_config_file" "$openclaw_auth_file"
+rm -f "$openclaw_config_file"
 docker exec "$CONTAINER" cat /home/agent/.openclaw/.env | grep -F "OPENAI_API_KEY=${CCSWITCH_API_KEY}" >/dev/null
 
 printf '==> checking OpenClaw gateway inference through ccswitch\n'
@@ -262,15 +274,15 @@ run_openclaw_gateway_infer "$infer_output"
 assert_openclaw_infer_json "$infer_output"
 rm -f "$infer_output"
 
-printf '==> checking health endpoint again\n'
+printf '==> checking readiness endpoint again\n'
 ready=0
 for _ in $(seq 1 15); do
-  if curl --noproxy '*' -fsS --max-time 5 "http://127.0.0.1:${HOST_PORT}/healthz" >/dev/null 2>&1; then
+  if curl --noproxy '*' -fsS --max-time 5 "http://127.0.0.1:${HOST_PORT}/readyz" >/dev/null 2>&1; then
     ready=1
     break
   fi
   sleep 2
 done
-[[ "$ready" -eq 1 ]] || fail "OpenClaw health endpoint did not stay ready after config changes"
+[[ "$ready" -eq 1 ]] || fail "OpenClaw readiness endpoint did not stay ready after config changes"
 
 printf '==> OpenClaw smoke passed\n'

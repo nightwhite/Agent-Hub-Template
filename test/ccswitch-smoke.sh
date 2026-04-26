@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-HERMES_IMAGE="${HERMES_IMAGE:-agent-hub/hermes:local}"
+HERMES_IMAGE="${HERMES_IMAGE:-agent-hub/hermes-agent:local}"
 OPENCLAW_IMAGE="${OPENCLAW_IMAGE:-agent-hub/openclaw:local}"
 HERMES_CONTAINER="${HERMES_CONTAINER:-hermes-ccswitch-smoke-$RANDOM}"
 OPENCLAW_CONTAINER="${OPENCLAW_CONTAINER:-openclaw-ccswitch-smoke-$RANDOM}"
@@ -54,13 +54,13 @@ assert "data" in payload, payload
 '
 }
 
-assert_runtime_reload_applied() {
+assert_runtime_config_applied() {
   local output="$1"
   printf '%s' "$output" | python3 -c 'import json, sys
 payload = json.load(sys.stdin)
-runtime_reload = payload.get("data", {}).get("runtimeReload", {})
-assert runtime_reload.get("applied") is True, payload
-assert runtime_reload.get("skipped") is False, payload
+runtime_apply = payload.get("data", {}).get("runtimeApply", {})
+assert runtime_apply.get("applied") is True, payload
+assert runtime_apply.get("skipped") is False, payload
 '
 }
 
@@ -100,17 +100,26 @@ import sys
 
 path, expected_model = sys.argv[1], sys.argv[2]
 payload = json.load(open(path, encoding="utf-8"))
+if payload.get("transport") == "gateway":
+    outputs = payload.get("outputs", [])
+    provider = payload.get("provider")
+    model = payload.get("model")
+else:
+    result = payload.get("result", {})
+    outputs = result.get("payloads", [])
+    agent_meta = result.get("meta", {}).get("agentMeta", {})
+    provider = agent_meta.get("provider")
+    model = agent_meta.get("model")
 texts = [
     item.get("text")
-    for item in payload.get("outputs", [])
+    for item in outputs
     if isinstance(item, dict) and item.get("text")
 ]
 text = payload.get("output") or payload.get("text") or payload.get("content") or " ".join(texts)
-assert payload.get("transport") == "gateway", payload
-assert payload.get("provider") == "ccswitch", payload
-assert payload.get("model") == expected_model, payload
+assert provider == "ccswitch", payload
+assert model == expected_model, payload
 assert text, payload
-print(f"openclaw_gateway=ok model={payload.get('model')} text={text[:120]}")
+print(f"openclaw_gateway=ok model={model} text={text[:120]}")
 PY
 }
 
@@ -139,7 +148,7 @@ wait_for_hermes() {
 wait_for_openclaw() {
   local ready=0
   for _ in $(seq 1 90); do
-    if curl --noproxy '*' -fsS --max-time 2 "http://127.0.0.1:${OPENCLAW_HOST_PORT}/healthz" >/dev/null 2>&1; then
+    if curl --noproxy '*' -fsS --max-time 2 "http://127.0.0.1:${OPENCLAW_HOST_PORT}/readyz" >/dev/null 2>&1; then
       ready=1
       break
     fi
@@ -153,23 +162,31 @@ run_openclaw_gateway_infer() {
   python3 - "$OPENCLAW_CONTAINER" "$output_file" "$OPENCLAW_INFER_TIMEOUT_SECONDS" "$CCSWITCH_MODEL" <<'PY'
 import subprocess
 import sys
+import uuid
 
 container, output_file, timeout_seconds, model = sys.argv[1], sys.argv[2], int(sys.argv[3]), sys.argv[4]
+params = {
+    "agentId": "main",
+    "message": "Reply with exactly: pong",
+    "provider": "ccswitch",
+    "model": model,
+    "idempotencyKey": f"openclaw-ccswitch-smoke-{uuid.uuid4().hex}",
+}
 cmd = [
     "docker",
     "exec",
     container,
     "/opt/agent/entrypoint.sh",
     "run",
-    "infer",
-    "model",
-    "run",
-    "--gateway",
+    "gateway",
+    "call",
+    "agent",
+    "--expect-final",
+    "--timeout",
+    str(timeout_seconds * 1000),
     "--json",
-    "--model",
-    f"ccswitch/{model}",
-    "--prompt",
-    "Reply with exactly: pong",
+    "--params",
+    __import__("json").dumps(params),
 ]
 with open(output_file, "wb") as output:
     completed = subprocess.run(cmd, stdout=output, stderr=subprocess.PIPE, timeout=timeout_seconds)
@@ -216,7 +233,7 @@ if [[ "$BUILD_IMAGES" == "1" ]]; then
     --platform "$DOCKER_PLATFORM" \
     --add-host host.docker.internal=host-gateway \
     "${docker_proxy_args[@]+"${docker_proxy_args[@]}"}" \
-    -f agents/hermes/Dockerfile \
+    -f agents/hermes-agent/Dockerfile \
     -t "$HERMES_IMAGE" \
     .
   docker build \
@@ -248,10 +265,9 @@ docker run -d \
   "$HERMES_IMAGE" >/dev/null
 wait_for_hermes
 
-run_config_json "$HERMES_CONTAINER" provider set-main ccswitch "$CCSWITCH_CONTAINER_BASE_URL" chat_completions >/dev/null
+run_config_json "$HERMES_CONTAINER" provider set-main ccswitch "$CCSWITCH_CONTAINER_BASE_URL" chat_completions CCSWITCH_API_KEY >/dev/null
 run_config_json "$HERMES_CONTAINER" model set-main "$CCSWITCH_MODEL" >/dev/null
 run_config_json "$HERMES_CONTAINER" env set CCSWITCH_API_KEY "$CCSWITCH_API_KEY" >/dev/null
-run_config_json "$HERMES_CONTAINER" env set OPENAI_API_KEY "$CCSWITCH_API_KEY" >/dev/null
 hermes_output="$(mktemp)"
 curl --noproxy '*' -fsS --max-time 90 "http://127.0.0.1:${HERMES_HOST_PORT}/v1/chat/completions" \
   -H 'Content-Type: application/json' \
@@ -278,12 +294,12 @@ assert_runtime_apply_applied "$runtime_output"
 runtime_output="$(run_config_json "$OPENCLAW_CONTAINER" model set-main ccswitch "$CCSWITCH_MODEL")"
 assert_runtime_apply_applied "$runtime_output"
 secret_output="$(run_config_json "$OPENCLAW_CONTAINER" provider set-api-key ccswitch "$CCSWITCH_API_KEY")"
-assert_runtime_reload_applied "$secret_output"
+assert_runtime_config_applied "$secret_output"
 openclaw_output="$(mktemp)"
 run_openclaw_gateway_infer "$openclaw_output"
 assert_openclaw_gateway_text "$openclaw_output"
 rm -f "$openclaw_output"
 
-curl --noproxy '*' -fsS --max-time 5 "http://127.0.0.1:${OPENCLAW_HOST_PORT}/healthz" >/dev/null
+curl --noproxy '*' -fsS --max-time 5 "http://127.0.0.1:${OPENCLAW_HOST_PORT}/readyz" >/dev/null
 
 printf '==> ccswitch smoke passed\n'

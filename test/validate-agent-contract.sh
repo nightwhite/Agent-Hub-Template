@@ -4,7 +4,7 @@ set -euo pipefail
 if [[ "$#" -gt 0 ]]; then
   agents=("$@")
 else
-  agents=(agents/_template agents/hermes agents/openclaw)
+  agents=(agents/_template agents/hermes-agent agents/openclaw)
 fi
 required_files=(Dockerfile install.sh entrypoint.sh config.sh config.json index.json deploy.yaml README.md)
 

@@ -5,6 +5,7 @@ AGENT_NAME="${AGENT_NAME:-openclaw}"
 OPENCLAW_STATE_DIR="${OPENCLAW_STATE_DIR:-/home/agent/.openclaw}"
 OPENCLAW_CONFIG_PATH="${OPENCLAW_CONFIG_PATH:-${OPENCLAW_STATE_DIR}/openclaw.json}"
 OPENCLAW_WORKSPACE="${OPENCLAW_WORKSPACE:-/workspace}"
+OPENCLAW_PLUGIN_STAGE_DIR="${OPENCLAW_PLUGIN_STAGE_DIR:-/opt/openclaw/plugin-runtime-deps}"
 PATH="/usr/local/bin:${PATH}"
 
 # shellcheck disable=SC1091
@@ -21,13 +22,18 @@ run_as_agent() {
     OPENCLAW_STATE_DIR="$OPENCLAW_STATE_DIR" \
     OPENCLAW_CONFIG_PATH="$OPENCLAW_CONFIG_PATH" \
     OPENCLAW_WORKSPACE="$OPENCLAW_WORKSPACE" \
+    OPENCLAW_PLUGIN_STAGE_DIR="$OPENCLAW_PLUGIN_STAGE_DIR" \
     PATH="$PATH" \
     "$@"
 }
 
 start_agent() {
   [[ "$#" -eq 0 ]] || fail "openclaw start does not accept extra arguments in phase 1"
-  run_as_agent env OPENCLAW_NO_RESPAWN=1 openclaw gateway run
+  run_as_agent env \
+    OPENCLAW_NO_RESPAWN=1 \
+    OPENCLAW_SKIP_CHANNELS="${OPENCLAW_SKIP_CHANNELS:-1}" \
+    OPENCLAW_DISABLE_BONJOUR="${OPENCLAW_DISABLE_BONJOUR:-1}" \
+    openclaw gateway run
 }
 
 run_agent_cli() {

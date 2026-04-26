@@ -18,7 +18,7 @@
 ```text
 agents/
   _template/
-  hermes/
+  hermes-agent/
   openclaw/
 registry/
   agents.yaml
@@ -114,7 +114,7 @@ cat /opt/agent/config.json
 ## 当前样板
 
 - `agents/_template`: 新 agent 的最小模板
-- `agents/hermes`: 基于 Hermes 原生 `config.yaml + .env + hermes gateway run`
+- `agents/hermes-agent`: 基于 Hermes 原生 `config.yaml + .env + hermes gateway run`
 - `agents/openclaw`: 基于 OpenClaw 原生 `openclaw.json + .env + openclaw gateway run`
 
 ## 本地验证

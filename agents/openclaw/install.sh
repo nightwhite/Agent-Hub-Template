@@ -2,7 +2,7 @@
 set -euo pipefail
 
 NODE_MAJOR="${NODE_MAJOR:-22}"
-OPENCLAW_VERSION="${OPENCLAW_VERSION:-2026.4.22}"
+OPENCLAW_VERSION="${OPENCLAW_VERSION:-2026.4.24}"
 OPENCLAW_STATE_DIR="${OPENCLAW_STATE_DIR:-/home/agent/.openclaw}"
 OPENCLAW_CONFIG_PATH="${OPENCLAW_CONFIG_PATH:-${OPENCLAW_STATE_DIR}/openclaw.json}"
 OPENCLAW_WORKSPACE="${OPENCLAW_WORKSPACE:-/workspace}"
@@ -60,6 +60,19 @@ write_default_state() {
       "workspace": "${OPENCLAW_WORKSPACE}",
       "model": {
         "primary": "openai/gpt-5.4"
+      }
+    }
+  },
+  "plugins": {
+    "entries": {
+      "acpx": {
+        "enabled": false
+      },
+      "bonjour": {
+        "enabled": false
+      },
+      "browser": {
+        "enabled": false
       }
     }
   }

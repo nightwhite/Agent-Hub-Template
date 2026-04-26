@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-AGENT_NAME="${AGENT_NAME:-hermes}"
+AGENT_NAME="${AGENT_NAME:-hermes-agent}"
 HERMES_HOME="${HERMES_HOME:-/home/agent/.hermes}"
 HERMES_CONFIG_FILE="${HERMES_CONFIG_FILE:-${HERMES_HOME}/config.yaml}"
 HERMES_DOTENV_FILE="${HERMES_DOTENV_FILE:-${HERMES_HOME}/.env}"
@@ -194,40 +194,53 @@ BUILTIN_PROVIDERS = {
 def save() -> None:
     config_path.write_text(yaml.safe_dump(config, allow_unicode=True, sort_keys=False), encoding="utf-8")
 
-def current_custom_provider(provider: str) -> dict | None:
-    providers = config.get("custom_providers")
-    if not isinstance(providers, list):
-        return None
+def current_provider_entry(provider: str) -> tuple[dict | None, str | None]:
     normalized = provider.strip().lower()
-    for entry in providers:
-        if not isinstance(entry, dict):
-            continue
-        names = {
-            str(entry.get("name") or "").strip().lower(),
-            str(entry.get("provider_key") or "").strip().lower(),
-        }
-        if normalized in names:
-            return entry
-    return None
+    providers = config.get("providers")
+    if isinstance(providers, dict):
+        for key, entry in providers.items():
+            if not isinstance(entry, dict):
+                continue
+            names = {
+                str(key).strip().lower(),
+                str(entry.get("name") or "").strip().lower(),
+            }
+            if normalized in names:
+                return entry, "providers"
 
-def upsert_custom_provider(provider: str, base_url: str, api_mode: str | None) -> dict:
-    providers = config.get("custom_providers")
-    if not isinstance(providers, list):
-        providers = []
-    config["custom_providers"] = providers
+    legacy = config.get("custom_providers")
+    if isinstance(legacy, list):
+        for entry in legacy:
+            if not isinstance(entry, dict):
+                continue
+            names = {
+                str(entry.get("name") or "").strip().lower(),
+                str(entry.get("provider_key") or "").strip().lower(),
+            }
+            if normalized in names:
+                return entry, "custom_providers"
+    return None, None
 
-    entry = current_custom_provider(provider)
-    if entry is None:
-        entry = {"name": provider, "provider_key": provider}
-        providers.append(entry)
+def upsert_provider(provider: str, base_url: str, api_mode: str | None, key_env: str | None) -> dict:
+    providers = config.get("providers")
+    if not isinstance(providers, dict):
+        providers = {}
+    config["providers"] = providers
+
+    entry = providers.get(provider)
+    if not isinstance(entry, dict):
+        entry = {"name": provider}
+        providers[provider] = entry
 
     entry["base_url"] = base_url
     if model.get("default"):
-        entry["model"] = model.get("default")
+        entry["default_model"] = model.get("default")
     if api_mode:
         entry["api_mode"] = api_mode
     elif provider.strip().lower() == "ccswitch":
         entry["api_mode"] = "chat_completions"
+    if key_env:
+        entry["key_env"] = key_env
     return entry
 
 def read_env(env_path: pathlib.Path) -> dict[str, str]:
@@ -253,6 +266,7 @@ if command == "set-provider":
     provider = args[0]
     base_url = args[1] if len(args) > 1 else ""
     api_mode = args[2] if len(args) > 2 else ""
+    key_env = args[3] if len(args) > 3 else ""
     normalized_provider = provider.strip().lower()
     if normalized_provider not in BUILTIN_PROVIDERS and not base_url:
         raise SystemExit(f"provider {provider!r} requires base_url because Hermes treats it as a named custom provider")
@@ -262,7 +276,7 @@ if command == "set-provider":
             model["base_url"] = base_url
         else:
             model.pop("base_url", None)
-            upsert_custom_provider(provider, base_url, api_mode or None)
+            upsert_provider(provider, base_url, api_mode or None, key_env or None)
     else:
         model.pop("base_url", None)
     if api_mode and normalized_provider in {"custom"}:
@@ -270,21 +284,23 @@ if command == "set-provider":
     elif normalized_provider not in {"custom"}:
         model.pop("api_mode", None)
     save()
-    custom_entry = current_custom_provider(provider)
+    provider_entry, provider_native = current_provider_entry(provider)
     print(json.dumps({
         "provider": model.get("provider"),
-        "base_url": model.get("base_url") or (custom_entry or {}).get("base_url"),
-        "api_mode": model.get("api_mode") or (custom_entry or {}).get("api_mode"),
-        "native": "custom_providers" if custom_entry else "model",
+        "base_url": model.get("base_url") or (provider_entry or {}).get("base_url") or (provider_entry or {}).get("api"),
+        "api_mode": model.get("api_mode") or (provider_entry or {}).get("api_mode"),
+        "key_env": (provider_entry or {}).get("key_env"),
+        "native": provider_native if provider_entry else "model",
     }, ensure_ascii=False))
 elif command == "get-provider":
     provider = model.get("provider", "auto")
-    custom_entry = current_custom_provider(provider) if isinstance(provider, str) else None
+    provider_entry, provider_native = current_provider_entry(provider) if isinstance(provider, str) else (None, None)
     print(json.dumps({
         "provider": provider,
-        "base_url": model.get("base_url") or (custom_entry or {}).get("base_url"),
-        "api_mode": model.get("api_mode") or (custom_entry or {}).get("api_mode"),
-        "native": "custom_providers" if custom_entry else "model",
+        "base_url": model.get("base_url") or (provider_entry or {}).get("base_url") or (provider_entry or {}).get("api"),
+        "api_mode": model.get("api_mode") or (provider_entry or {}).get("api_mode"),
+        "key_env": (provider_entry or {}).get("key_env"),
+        "native": provider_native if provider_entry else "model",
     }, ensure_ascii=False))
 elif command == "delete-provider":
     model["provider"] = "auto"
@@ -297,9 +313,12 @@ elif command == "set-model":
     model["default"] = model_name
     provider = model.get("provider")
     if isinstance(provider, str):
-        custom_entry = current_custom_provider(provider)
-        if custom_entry is not None:
-            custom_entry["model"] = model_name
+        provider_entry, provider_native = current_provider_entry(provider)
+        if provider_entry is not None:
+            if provider_native == "providers":
+                provider_entry["default_model"] = model_name
+            else:
+                provider_entry["model"] = model_name
     save()
     print(json.dumps({"model": model.get("default")}, ensure_ascii=False))
 elif command == "get-model":
@@ -357,7 +376,7 @@ dispatch_config() {
   case "${resource}:${action}" in
     provider:set-main)
       require_arg "${1-}" "provider"
-      emit_success_from "$resource" "$action" hermes_yaml set-provider "$1" "${2:-}" "${3:-}"
+      emit_success_from "$resource" "$action" hermes_yaml set-provider "$1" "${2:-}" "${3:-}" "${4:-}"
       ;;
     provider:get-main)
       emit_success_from "$resource" "$action" hermes_yaml get-provider

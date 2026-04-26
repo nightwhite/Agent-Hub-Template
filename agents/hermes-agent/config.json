@@ -6,7 +6,7 @@
       {
         "resource": "provider",
         "label": "主 Provider",
-        "description": "直接维护 Hermes 原生 model.provider / model.base_url；非内置 provider 会写入 Hermes 原生 custom_providers。",
+        "description": "直接维护 Hermes 原生 model.provider / model.base_url；命名 provider 会写入 Hermes 当前原生 providers。",
         "actions": [
           {
             "action": "set-main",
@@ -38,6 +38,13 @@
                   { "label": "Anthropic Messages", "value": "anthropic_messages" }
                 ],
                 "placeholder": "chat_completions"
+              },
+              {
+                "name": "key_env",
+                "label": "API Key 环境变量",
+                "type": "text",
+                "required": false,
+                "placeholder": "CCSWITCH_API_KEY"
               }
             ]
           },
@@ -158,7 +165,7 @@
       {
         "resource": "provider",
         "label": "Main Provider",
-        "description": "Manage Hermes native model.provider / model.base_url directly. Non-built-in providers are stored in Hermes native custom_providers.",
+        "description": "Manage Hermes native model.provider / model.base_url directly. Named providers are stored in Hermes native providers.",
         "actions": [
           {
             "action": "set-main",
@@ -190,6 +197,13 @@
                   { "label": "Anthropic Messages", "value": "anthropic_messages" }
                 ],
                 "placeholder": "chat_completions"
+              },
+              {
+                "name": "key_env",
+                "label": "API Key Env",
+                "type": "text",
+                "required": false,
+                "placeholder": "CCSWITCH_API_KEY"
               }
             ]
           },

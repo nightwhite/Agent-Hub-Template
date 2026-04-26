@@ -40,7 +40,7 @@
       {
         "resource": "provider",
         "label": "Provider 覆盖",
-        "description": "直接维护 OpenClaw 原生 models.providers.<id> 的 endpoint / api 配置，以及 auth-profiles.json 中的 provider API key。",
+        "description": "直接维护 OpenClaw 原生 models.providers.<id> 的 endpoint / api 配置，以及 models.providers.<id>.apiKey。",
         "actions": [
           {
             "action": "set",
@@ -67,9 +67,18 @@
                 "type": "select",
                 "required": false,
                 "options": [
-                  { "label": "OpenAI Responses", "value": "openai-responses" },
-                  { "label": "OpenAI Completions", "value": "openai-completions" },
-                  { "label": "Anthropic Messages", "value": "anthropic-messages" }
+                  {
+                    "label": "OpenAI Responses",
+                    "value": "openai-responses"
+                  },
+                  {
+                    "label": "OpenAI Completions",
+                    "value": "openai-completions"
+                  },
+                  {
+                    "label": "Anthropic Messages",
+                    "value": "anthropic-messages"
+                  }
                 ],
                 "placeholder": "openai-responses"
               }
@@ -108,13 +117,6 @@
                 "required": true,
                 "placeholder": "sk-...",
                 "sensitive": true
-              },
-              {
-                "name": "profile",
-                "label": "Profile ID",
-                "type": "text",
-                "required": false,
-                "placeholder": "ccswitch:default"
               }
             ]
           },
@@ -129,13 +131,6 @@
                 "type": "text",
                 "required": true,
                 "placeholder": "ccswitch"
-              },
-              {
-                "name": "profile",
-                "label": "Profile ID",
-                "type": "text",
-                "required": false,
-                "placeholder": "ccswitch:default"
               }
             ]
           },
@@ -150,13 +145,6 @@
                 "type": "text",
                 "required": true,
                 "placeholder": "ccswitch"
-              },
-              {
-                "name": "profile",
-                "label": "Profile ID",
-                "type": "text",
-                "required": false,
-                "placeholder": "ccswitch:default"
               }
             ]
           },
@@ -193,11 +181,26 @@
                 "required": false,
                 "default": "lan",
                 "options": [
-                  { "label": "LAN", "value": "lan" },
-                  { "label": "Loopback", "value": "loopback" },
-                  { "label": "Auto", "value": "auto" },
-                  { "label": "Tailnet", "value": "tailnet" },
-                  { "label": "Custom", "value": "custom" }
+                  {
+                    "label": "LAN",
+                    "value": "lan"
+                  },
+                  {
+                    "label": "Loopback",
+                    "value": "loopback"
+                  },
+                  {
+                    "label": "Auto",
+                    "value": "auto"
+                  },
+                  {
+                    "label": "Tailnet",
+                    "value": "tailnet"
+                  },
+                  {
+                    "label": "Custom",
+                    "value": "custom"
+                  }
                 ],
                 "placeholder": "lan"
               },
@@ -377,7 +380,7 @@
       {
         "resource": "provider",
         "label": "Provider Override",
-        "description": "Manage OpenClaw native models.providers.<id> endpoint/api settings and provider API keys in auth-profiles.json directly.",
+        "description": "Manage OpenClaw native models.providers.<id> endpoint/api settings and models.providers.<id>.apiKey directly.",
         "actions": [
           {
             "action": "set",
@@ -404,9 +407,18 @@
                 "type": "select",
                 "required": false,
                 "options": [
-                  { "label": "OpenAI Responses", "value": "openai-responses" },
-                  { "label": "OpenAI Completions", "value": "openai-completions" },
-                  { "label": "Anthropic Messages", "value": "anthropic-messages" }
+                  {
+                    "label": "OpenAI Responses",
+                    "value": "openai-responses"
+                  },
+                  {
+                    "label": "OpenAI Completions",
+                    "value": "openai-completions"
+                  },
+                  {
+                    "label": "Anthropic Messages",
+                    "value": "anthropic-messages"
+                  }
                 ],
                 "placeholder": "openai-responses"
               }
@@ -445,13 +457,6 @@
                 "required": true,
                 "placeholder": "sk-...",
                 "sensitive": true
-              },
-              {
-                "name": "profile",
-                "label": "Profile ID",
-                "type": "text",
-                "required": false,
-                "placeholder": "ccswitch:default"
               }
             ]
           },
@@ -466,13 +471,6 @@
                 "type": "text",
                 "required": true,
                 "placeholder": "ccswitch"
-              },
-              {
-                "name": "profile",
-                "label": "Profile ID",
-                "type": "text",
-                "required": false,
-                "placeholder": "ccswitch:default"
               }
             ]
           },
@@ -487,13 +485,6 @@
                 "type": "text",
                 "required": true,
                 "placeholder": "ccswitch"
-              },
-              {
-                "name": "profile",
-                "label": "Profile ID",
-                "type": "text",
-                "required": false,
-                "placeholder": "ccswitch:default"
               }
             ]
           },
@@ -530,11 +521,26 @@
                 "required": false,
                 "default": "lan",
                 "options": [
-                  { "label": "LAN", "value": "lan" },
-                  { "label": "Loopback", "value": "loopback" },
-                  { "label": "Auto", "value": "auto" },
-                  { "label": "Tailnet", "value": "tailnet" },
-                  { "label": "Custom", "value": "custom" }
+                  {
+                    "label": "LAN",
+                    "value": "lan"
+                  },
+                  {
+                    "label": "Loopback",
+                    "value": "loopback"
+                  },
+                  {
+                    "label": "Auto",
+                    "value": "auto"
+                  },
+                  {
+                    "label": "Tailnet",
+                    "value": "tailnet"
+                  },
+                  {
+                    "label": "Custom",
+                    "value": "custom"
+                  }
                 ],
                 "placeholder": "lan"
               },

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-AGENT_NAME="${AGENT_NAME:-hermes}"
+AGENT_NAME="${AGENT_NAME:-hermes-agent}"
 HERMES_HOME="${HERMES_HOME:-/home/agent/.hermes}"
 HERMES_VENV="${HERMES_VENV:-/opt/hermes/venv}"
 PATH="${HERMES_VENV}/bin:${PATH}"

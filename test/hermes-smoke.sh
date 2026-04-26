@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-IMAGE="${IMAGE:-agent-hub/hermes:local}"
+IMAGE="${IMAGE:-agent-hub/hermes-agent:local}"
 CONTAINER="${CONTAINER:-hermes-smoke-$RANDOM}"
 HOST_PORT="${HOST_PORT:-28642}"
 DOCKER_PLATFORM="${DOCKER_PLATFORM:-linux/amd64}"
@@ -106,7 +106,7 @@ docker build \
   --platform "$DOCKER_PLATFORM" \
   --add-host host.docker.internal=host-gateway \
   "${docker_proxy_args[@]+"${docker_proxy_args[@]}"}" \
-  -f agents/hermes/Dockerfile \
+  -f agents/hermes-agent/Dockerfile \
   -t "$IMAGE" \
   .
 
@@ -137,25 +137,26 @@ docker exec "$CONTAINER" cat /opt/agent/config.json | python3 -c 'import json, s
 docker exec "$CONTAINER" /opt/agent/entrypoint.sh run version >/dev/null
 
 printf '==> mutating Hermes native config through JSON protocol\n'
-run_config_json provider set-main ccswitch http://host.docker.internal:11434/v1 chat_completions >/dev/null
+run_config_json provider set-main ccswitch http://host.docker.internal:11434/v1 chat_completions CCSWITCH_API_KEY >/dev/null
 run_config_json model set-main gpt-5.4 >/dev/null
-secret_output="$(run_config_json env set OPENAI_API_KEY sk-local-test)"
+secret_output="$(run_config_json env set CCSWITCH_API_KEY sk-local-test)"
 [[ "$secret_output" != *sk-local-test* ]] || fail "secret value leaked in env set output"
 run_config_json provider get-main >/dev/null
 run_config_json model get-main >/dev/null
-secret_output="$(run_config_json env get OPENAI_API_KEY)"
+secret_output="$(run_config_json env get CCSWITCH_API_KEY)"
 [[ "$secret_output" != *sk-local-test* ]] || fail "secret value leaked in env get output"
 run_config_json env list >/dev/null
 expect_config_error model set-main
 
 printf '==> verifying config files\n'
 docker exec "$CONTAINER" sh -lc 'grep -q "provider: ccswitch" /home/agent/.hermes/config.yaml'
-docker exec "$CONTAINER" sh -lc 'grep -q "custom_providers:" /home/agent/.hermes/config.yaml'
-docker exec "$CONTAINER" sh -lc 'grep -q "provider_key: ccswitch" /home/agent/.hermes/config.yaml'
+docker exec "$CONTAINER" sh -lc 'grep -q "providers:" /home/agent/.hermes/config.yaml'
+docker exec "$CONTAINER" sh -lc 'grep -q "ccswitch:" /home/agent/.hermes/config.yaml'
 docker exec "$CONTAINER" sh -lc 'grep -q "base_url: http://host.docker.internal:11434/v1" /home/agent/.hermes/config.yaml'
 docker exec "$CONTAINER" sh -lc 'grep -q "api_mode: chat_completions" /home/agent/.hermes/config.yaml'
+docker exec "$CONTAINER" sh -lc 'grep -q "key_env: CCSWITCH_API_KEY" /home/agent/.hermes/config.yaml'
 docker exec "$CONTAINER" sh -lc 'grep -q "default: gpt-5.4" /home/agent/.hermes/config.yaml'
-docker exec "$CONTAINER" sh -lc 'grep -q "OPENAI_API_KEY=sk-local-test" /home/agent/.hermes/.env'
+docker exec "$CONTAINER" sh -lc 'grep -q "CCSWITCH_API_KEY=sk-local-test" /home/agent/.hermes/.env'
 
 printf '==> checking Hermes API server again\n'
 curl --noproxy '*' -fsS --max-time 5 "http://127.0.0.1:${HOST_PORT}/v1/models" \
