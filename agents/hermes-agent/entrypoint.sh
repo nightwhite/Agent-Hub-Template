@@ -27,6 +27,12 @@ run_as_agent() {
     "$@"
 }
 
+ensure_agent_ownership() {
+  if [[ "$(id -u)" -eq 0 ]]; then
+    chown -R agent:agent "$HERMES_HOME"
+  fi
+}
+
 start_agent() {
   [[ "$#" -eq 0 ]] || fail "hermes start does not accept extra arguments in phase 1"
   run_as_agent hermes gateway run
@@ -42,6 +48,7 @@ main() {
   shift || true
 
   ensure_hermes_state
+  ensure_agent_ownership
 
   case "$command" in
     start)

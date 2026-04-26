@@ -104,7 +104,7 @@ trap cleanup EXIT
 printf '==> building %s (%s)\n' "$IMAGE" "$DOCKER_PLATFORM"
 docker build \
   --platform "$DOCKER_PLATFORM" \
-  --add-host host.docker.internal=host-gateway \
+  --add-host host.docker.internal:host-gateway \
   "${docker_proxy_args[@]+"${docker_proxy_args[@]}"}" \
   -f agents/hermes-agent/Dockerfile \
   -t "$IMAGE" \

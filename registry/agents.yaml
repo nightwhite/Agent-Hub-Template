@@ -1,7 +1,7 @@
 agents:
   - name: hermes-agent
     path: agents/hermes-agent
-    enabled: false
+    enabled: true
   - name: openclaw
     path: agents/openclaw
-    enabled: false
+    enabled: true

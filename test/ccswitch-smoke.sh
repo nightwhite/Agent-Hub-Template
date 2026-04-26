@@ -231,14 +231,14 @@ if [[ "$BUILD_IMAGES" == "1" ]]; then
   printf '==> building Hermes and OpenClaw images (%s)\n' "$DOCKER_PLATFORM"
   docker build \
     --platform "$DOCKER_PLATFORM" \
-    --add-host host.docker.internal=host-gateway \
+    --add-host host.docker.internal:host-gateway \
     "${docker_proxy_args[@]+"${docker_proxy_args[@]}"}" \
     -f agents/hermes-agent/Dockerfile \
     -t "$HERMES_IMAGE" \
     .
   docker build \
     --platform "$DOCKER_PLATFORM" \
-    --add-host host.docker.internal=host-gateway \
+    --add-host host.docker.internal:host-gateway \
     "${docker_proxy_args[@]+"${docker_proxy_args[@]}"}" \
     -f agents/openclaw/Dockerfile \
     -t "$OPENCLAW_IMAGE" \

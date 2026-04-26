@@ -58,6 +58,9 @@ require_arg() {
 
 run_as_agent_script() {
   if [[ "$(id -u)" -eq 0 ]] && [[ "${OPENCLAW_CONFIG_AS_AGENT:-1}" == "1" ]]; then
+    ensure_openclaw_state
+    chown -R agent:agent "$OPENCLAW_STATE_DIR"
+    chown agent:agent "$OPENCLAW_WORKSPACE"
     exec runuser -u agent -- env \
       OPENCLAW_CONFIG_AS_AGENT=0 \
       AGENT_NAME="$AGENT_NAME" \

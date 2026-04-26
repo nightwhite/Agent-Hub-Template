@@ -76,6 +76,8 @@ require_arg() {
 
 run_as_agent_script() {
   if [[ "$(id -u)" -eq 0 ]] && [[ "${HERMES_CONFIG_AS_AGENT:-1}" == "1" ]]; then
+    ensure_hermes_state
+    chown -R agent:agent "$HERMES_HOME"
     exec runuser -u agent -- env \
       HERMES_CONFIG_AS_AGENT=0 \
       AGENT_NAME="$AGENT_NAME" \

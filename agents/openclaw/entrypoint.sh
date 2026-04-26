@@ -27,6 +27,13 @@ run_as_agent() {
     "$@"
 }
 
+ensure_agent_ownership() {
+  if [[ "$(id -u)" -eq 0 ]]; then
+    chown -R agent:agent "$OPENCLAW_STATE_DIR"
+    chown agent:agent "$OPENCLAW_WORKSPACE"
+  fi
+}
+
 start_agent() {
   [[ "$#" -eq 0 ]] || fail "openclaw start does not accept extra arguments in phase 1"
   run_as_agent env \
@@ -46,6 +53,7 @@ main() {
   shift || true
 
   ensure_openclaw_state
+  ensure_agent_ownership
 
   case "$command" in
     start)
