@@ -24,7 +24,7 @@
 - `config.sh`
   - 原生配置入口，输出 `{ ok, resource, action, applied, data }` 或 `{ ok, error }`
 - `config.json`
-  - 前端配置表单描述，必须包含 `schemaVersion: "devbox-agent-config.v1"`
+  - 前端配置表单描述，必须包含 `schemaVersion: "devbox-agent-config.v1"`、`zh.resources` 和 `en.resources`
 - `index.json`
   - 展示信息和 `runtime.kind`
 - `deploy.yaml`

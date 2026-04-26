@@ -15,7 +15,23 @@ log() {
 }
 
 json_quote() {
-  "$HERMES_PYTHON" -c 'import json, sys; print(json.dumps(sys.argv[1], ensure_ascii=False))' "${1-}"
+  if [[ -x "$HERMES_PYTHON" ]]; then
+    "$HERMES_PYTHON" -c 'import json, sys; print(json.dumps(sys.argv[1], ensure_ascii=False))' "${1-}"
+    return
+  fi
+
+  if command -v python3 >/dev/null 2>&1; then
+    python3 -c 'import json, sys; print(json.dumps(sys.argv[1], ensure_ascii=False))' "${1-}"
+    return
+  fi
+
+  local value="${1-}"
+  value="${value//\\/\\\\}"
+  value="${value//\"/\\\"}"
+  value="${value//$'\n'/\\n}"
+  value="${value//$'\r'/\\r}"
+  value="${value//$'\t'/\\t}"
+  printf '"%s"\n' "$value"
 }
 
 json_success() {
@@ -352,7 +368,7 @@ emit_success_from() {
   shift 2
   local data
 
-  if ! data="$($@)"; then
+  if ! data="$("$@")"; then
     fail "failed to apply ${resource} ${action}"
   fi
 

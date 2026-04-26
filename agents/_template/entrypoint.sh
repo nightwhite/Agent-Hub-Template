@@ -23,18 +23,18 @@ ensure_agent_state() {
 
 start_service_agent() {
   [[ "$#" -eq 0 ]] || fail "${AGENT_NAME} start does not accept extra arguments in phase 1"
-  fail "replace start_service_agent in agents/change-me/entrypoint.sh with the real long-running process"
+  fail "replace start_service_agent in this agent's entrypoint.sh with the real long-running process"
 }
 
 bootstrap_tool_agent() {
   [[ "$#" -eq 0 ]] || fail "${AGENT_NAME} start does not accept extra arguments in phase 1"
-  log "replace bootstrap_tool_agent in agents/change-me/entrypoint.sh with real bootstrap logic"
+  log "replace bootstrap_tool_agent in this agent's entrypoint.sh with real bootstrap logic"
   exec tail -f /dev/null
 }
 
 run_agent_cli() {
   [[ "$#" -gt 0 ]] || fail "${AGENT_NAME} run requires native CLI arguments"
-  fail "replace run_agent_cli in agents/change-me/entrypoint.sh with the real upstream CLI"
+  fail "replace run_agent_cli in this agent's entrypoint.sh with the real upstream CLI"
 }
 
 start_agent() {

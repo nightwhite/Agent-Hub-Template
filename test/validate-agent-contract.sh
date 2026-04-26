@@ -4,7 +4,41 @@ set -euo pipefail
 if [[ "$#" -gt 0 ]]; then
   agents=("$@")
 else
-  agents=(agents/_template agents/hermes-agent agents/openclaw)
+  agents=()
+  while IFS= read -r agent_dir; do
+    agents+=("$agent_dir")
+  done < <(
+    python3 - <<'PY'
+from pathlib import Path
+
+registry_path = Path("registry/agents.yaml")
+paths = ["agents/_template"]
+current = None
+
+for raw_line in registry_path.read_text(encoding="utf-8").splitlines():
+    line = raw_line.strip()
+    if not line or line.startswith("#") or line == "agents:":
+        continue
+    if line.startswith("- "):
+        if current and current.get("path"):
+            paths.append(current["path"])
+        current = {}
+        line = line[2:]
+    if ":" not in line or current is None:
+        continue
+    key, value = line.split(":", 1)
+    current[key.strip()] = value.strip().strip("\"'")
+
+if current and current.get("path"):
+    paths.append(current["path"])
+
+seen = set()
+for path in paths:
+    if path not in seen:
+        seen.add(path)
+        print(path)
+PY
+  )
 fi
 required_files=(Dockerfile install.sh entrypoint.sh config.sh config.json index.json deploy.yaml README.md)
 
@@ -20,8 +54,23 @@ validate_json_file() {
 
 validate_yaml_file() {
   local file="$1"
-  command -v ruby >/dev/null 2>&1 || fail "ruby is required to validate YAML: $file"
-  ruby -e 'require "yaml"; YAML.safe_load(File.read(ARGV[0]), permitted_classes: [], permitted_symbols: [], aliases: true)' "$file" >/dev/null
+  if python3 -c 'import yaml' >/dev/null 2>&1; then
+    python3 - "$file" <<'PY'
+import sys
+from pathlib import Path
+import yaml
+
+yaml.safe_load(Path(sys.argv[1]).read_text(encoding="utf-8"))
+PY
+    return
+  fi
+
+  if command -v ruby >/dev/null 2>&1; then
+    ruby -e 'require "yaml"; YAML.safe_load(File.read(ARGV[0]), permitted_classes: [], permitted_symbols: [], aliases: true)' "$file" >/dev/null
+    return
+  fi
+
+  fail "python3 with PyYAML or ruby is required to validate YAML: $file"
 }
 
 validate_manifest() {

@@ -152,6 +152,8 @@ args: ["start"]
 }
 ```
 
+第一阶段要求 manifest 同时提供 `zh.resources` 和 `en.resources`，两种语言都描述同一组 resource/action，只允许展示文案不同。
+
 `config.json` 不存真实配置值，不存密钥。
 
 ## 6. Dockerfile 要做什么

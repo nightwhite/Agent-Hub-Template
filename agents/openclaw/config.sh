@@ -5,6 +5,7 @@ AGENT_NAME="${AGENT_NAME:-openclaw}"
 OPENCLAW_STATE_DIR="${OPENCLAW_STATE_DIR:-/home/agent/.openclaw}"
 OPENCLAW_CONFIG_PATH="${OPENCLAW_CONFIG_PATH:-${OPENCLAW_STATE_DIR}/openclaw.json}"
 OPENCLAW_DOTENV_FILE="${OPENCLAW_DOTENV_FILE:-${OPENCLAW_STATE_DIR}/.env}"
+OPENCLAW_GATEWAY_TOKEN="${OPENCLAW_GATEWAY_TOKEN:-change-me-local-dev}"
 OPENCLAW_WORKSPACE="${OPENCLAW_WORKSPACE:-/workspace}"
 OPENCLAW_PLUGIN_STAGE_DIR="${OPENCLAW_PLUGIN_STAGE_DIR:-/opt/openclaw/plugin-runtime-deps}"
 PATH="/usr/local/bin:${PATH}"
@@ -63,6 +64,7 @@ run_as_agent_script() {
       OPENCLAW_STATE_DIR="$OPENCLAW_STATE_DIR" \
       OPENCLAW_CONFIG_PATH="$OPENCLAW_CONFIG_PATH" \
       OPENCLAW_DOTENV_FILE="$OPENCLAW_DOTENV_FILE" \
+      OPENCLAW_GATEWAY_TOKEN="$OPENCLAW_GATEWAY_TOKEN" \
       OPENCLAW_WORKSPACE="$OPENCLAW_WORKSPACE" \
       OPENCLAW_PLUGIN_STAGE_DIR="$OPENCLAW_PLUGIN_STAGE_DIR" \
       HOME=/home/agent \
@@ -111,9 +113,7 @@ EOF_JSON
   fi
 
   if [[ ! -f "$OPENCLAW_DOTENV_FILE" ]]; then
-    cat >"$OPENCLAW_DOTENV_FILE" <<'EOF_ENV'
-OPENCLAW_GATEWAY_TOKEN=change-me-local-dev
-EOF_ENV
+    printf 'OPENCLAW_GATEWAY_TOKEN=%s\n' "$OPENCLAW_GATEWAY_TOKEN" >"$OPENCLAW_DOTENV_FILE"
   fi
 }
 
@@ -567,6 +567,18 @@ process.exit(currentMode === 'local' && currentBind === desiredBind && Number(cu
 NODE
 }
 
+validate_gateway_port() {
+  local port="${1:-}"
+  if [[ ! "$port" =~ ^[0-9]+$ ]] || [[ "${#port}" -gt 5 ]]; then
+    fail "gateway port must be an integer between 1 and 65535"
+  fi
+
+  local numeric_port=$((10#$port))
+  if (( numeric_port < 1 || numeric_port > 65535 )); then
+    fail "gateway port must be an integer between 1 and 65535"
+  fi
+}
+
 combine_data_with_runtime_patch() {
   local data="${1:-}"
   local patch_result="${2:-}"
@@ -644,7 +656,7 @@ emit_success_from() {
   shift 2
   local data
 
-  if ! data="$($@)"; then
+  if ! data="$("$@")"; then
     fail "failed to apply ${resource} ${action}"
   fi
 
@@ -769,6 +781,7 @@ dispatch_config() {
       local bind="${1:-lan}"
       local port="${2:-18789}"
       local data
+      validate_gateway_port "$port"
       data="$(openclaw_cli config get gateway --json)" || fail "failed to read gateway config"
       if wait_for_gateway_ready; then
         if gateway_local_is_runtime_noop "$data" "$bind" "$port"; then

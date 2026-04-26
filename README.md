@@ -66,6 +66,7 @@ test/
 
 - Dockerfile 必须把 `config.json` 复制到 `/opt/agent/config.json`
 - `config.json` 必须声明 `schemaVersion: "devbox-agent-config.v1"`
+- `config.json` 必须同时提供 `zh.resources` 和 `en.resources`，供前端按当前语言渲染同一个 agent 的配置动作
 - `config.json` 只描述该 agent 暴露给前端的原生配置能力，不存真实配置值或密钥
 - `config.sh` 是前端调用的唯一配置脚本入口
 - `config.sh` stdout 必须只输出统一 JSON envelope，stderr 才能输出日志
