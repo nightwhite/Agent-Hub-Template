@@ -27,6 +27,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Validate agent contracts
+        run: bash test/validate-agent-contract.sh
+
       - name: Resolve owner
         id: owner
         run: echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
