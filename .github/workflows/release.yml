@@ -15,6 +15,7 @@ permissions:
 
 jobs:
   prepare:
+    if: github.event_name != 'push' || github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.matrix.outputs.matrix }}
@@ -166,6 +167,7 @@ jobs:
       - name: Sync dev image refs
         env:
           OWNER: ${{ needs.prepare.outputs.owner }}
+          MATRIX: ${{ needs.prepare.outputs.matrix }}
         run: |
           python3 - <<'PY'
           import json
@@ -174,38 +176,10 @@ jobs:
           from pathlib import Path
 
           owner = os.environ["OWNER"]
+          matrix = json.loads(os.environ["MATRIX"])
           tag = f"dev-{os.environ['GITHUB_SHA'][:12]}"
-          registry_path = Path("registry/agents.yaml")
 
-          items = []
-          current = None
-          for raw_line in registry_path.read_text().splitlines():
-              line = raw_line.strip()
-              if not line or line.startswith("#") or line == "agents:":
-                  continue
-              if line.startswith("- "):
-                  if current:
-                      items.append(current)
-                  current = {}
-                  line = line[2:]
-              if ":" not in line:
-                  continue
-              key, value = line.split(":", 1)
-              value = value.strip()
-              if value.lower() == "true":
-                  parsed = True
-              elif value.lower() == "false":
-                  parsed = False
-              else:
-                  parsed = value.strip("\"'")
-              if current is not None:
-                  current[key.strip()] = parsed
-          if current:
-              items.append(current)
-
-          for item in items:
-              if item.get("enabled") is not True:
-                  continue
+          for item in matrix["include"]:
               name = str(item["name"])
               path = Path(str(item["path"]))
               image = f"ghcr.io/{owner}/{name}:{tag}"

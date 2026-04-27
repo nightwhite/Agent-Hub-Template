@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: openclaw
-          image: agent-hub/openclaw:dev
+          image: ghcr.io/nightwhite/openclaw:dev
           imagePullPolicy: IfNotPresent
           args: ["start"]
           workingDir: /workspace

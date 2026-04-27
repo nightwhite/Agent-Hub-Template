@@ -125,7 +125,7 @@ cat /opt/agent/config.json
 - 合并到 `master` / `main` 后发布开发镜像：
   - 不可变 tag: `dev-<merge-sha12>`
   - 浮动 tag: `dev`
-  - 发布成功后，Actions 自动把 enabled agents 的 `index.json.image` 和 `deploy.yaml image` 回写成 `dev-<merge-sha12>`
+  - 发布成功后，Actions 自动把 enabled agents 的完整镜像引用回写成 `ghcr.io/<owner>/<agent>:dev-<merge-sha12>`
 - 正式发布时，每个 agent 使用自己的 `index.json.version` 作为镜像 tag：
   - `agents/hermes-agent/index.json` 的 `version` 决定 `ghcr.io/<owner>/hermes-agent:<version>`
   - `agents/openclaw/index.json` 的 `version` 决定 `ghcr.io/<owner>/openclaw:<version>`
