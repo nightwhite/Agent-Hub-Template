@@ -5,7 +5,7 @@
   "desc": "OpenClaw gateway adapter for Sealos Devbox with fixed start/config contracts.",
   "version": "2026.4.24",
   "status": "experimental",
-  "image": "ghcr.io/nightwhite/openclaw:dev",
+  "image": "ghcr.io/gitlayzer/openclaw:dev-c9a9cd2d0d26",
   "base_image": "ghcr.io/gitlayzer/ubuntu:22.04-base",
   "category": "platform-agent",
   "repo_path": "agents/openclaw",

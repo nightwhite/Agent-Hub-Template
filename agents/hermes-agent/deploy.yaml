@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: hermes-agent
-          image: ghcr.io/nightwhite/hermes-agent:dev
+          image: ghcr.io/gitlayzer/hermes-agent:dev-c9a9cd2d0d26
           imagePullPolicy: IfNotPresent
           env:
             - name: API_SERVER_ENABLED

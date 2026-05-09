@@ -16,7 +16,7 @@ spec:
     spec:
       containers:
         - name: openclaw
-          image: ghcr.io/nightwhite/openclaw:dev
+          image: ghcr.io/gitlayzer/openclaw:dev-c9a9cd2d0d26
           imagePullPolicy: IfNotPresent
           args: ["start"]
           workingDir: /workspace
