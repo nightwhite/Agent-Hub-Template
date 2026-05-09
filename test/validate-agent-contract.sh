@@ -1,51 +1,76 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+fail() {
+  printf '[ERROR] %s\n' "$*" >&2
+  exit 1
+}
+
 if [[ "$#" -gt 0 ]]; then
   agents=("$@")
 else
-  agents=()
-  while IFS= read -r agent_dir; do
-    agents+=("$agent_dir")
-  done < <(
-    python3 - <<'PY'
+  agent_list="$(
+    if python3 -c 'import yaml' >/dev/null 2>&1; then
+      python3 - <<'PY'
+import sys
 from pathlib import Path
+import yaml
 
 registry_path = Path("registry/agents.yaml")
+data = yaml.safe_load(registry_path.read_text(encoding="utf-8"))
+if not isinstance(data, dict):
+    raise SystemExit(f"{registry_path}: top-level YAML must be a mapping")
+items = data.get("agents")
+if not isinstance(items, list):
+    raise SystemExit(f"{registry_path}: agents must be a list")
+
 paths = ["agents/_template"]
-current = None
-
-for raw_line in registry_path.read_text(encoding="utf-8").splitlines():
-    line = raw_line.strip()
-    if not line or line.startswith("#") or line == "agents:":
-        continue
-    if line.startswith("- "):
-        if current and current.get("path"):
-            paths.append(current["path"])
-        current = {}
-        line = line[2:]
-    if ":" not in line or current is None:
-        continue
-    key, value = line.split(":", 1)
-    current[key.strip()] = value.strip().strip("\"'")
-
-if current and current.get("path"):
-    paths.append(current["path"])
-
+for index, item in enumerate(items):
+    if not isinstance(item, dict):
+        raise SystemExit(f"{registry_path}: agents[{index}] must be a mapping")
+    path = item.get("path")
+    if path:
+        paths.append(str(path))
 seen = set()
 for path in paths:
     if path not in seen:
         seen.add(path)
         print(path)
 PY
-  )
+    elif command -v ruby >/dev/null 2>&1; then
+      ruby <<'RB'
+require "yaml"
+
+registry_path = "registry/agents.yaml"
+data = YAML.safe_load(File.read(registry_path), permitted_classes: [], permitted_symbols: [], aliases: true)
+abort("#{registry_path}: top-level YAML must be a mapping") unless data.is_a?(Hash)
+items = data["agents"]
+abort("#{registry_path}: agents must be a list") unless items.is_a?(Array)
+
+paths = ["agents/_template"]
+items.each_with_index do |item, index|
+  abort("#{registry_path}: agents[#{index}] must be a mapping") unless item.is_a?(Hash)
+  path = item["path"]
+  paths << path.to_s if path && !path.to_s.empty?
+end
+
+seen = {}
+paths.each do |path|
+  next if seen[path]
+  seen[path] = true
+  puts path
+end
+RB
+    else
+      exit 1
+    fi
+  )" || fail "python3 with PyYAML or ruby is required to read registry/agents.yaml"
+  agents=()
+  while IFS= read -r agent_dir; do
+    [[ -n "$agent_dir" ]] && agents+=("$agent_dir")
+  done <<<"$agent_list"
 fi
 required_files=(Dockerfile install.sh entrypoint.sh config.sh config.json index.json deploy.yaml README.md)
-
-fail() {
-  printf '[ERROR] %s\n' "$*" >&2
-  exit 1
-}
 
 validate_json_file() {
   local file="$1"
@@ -150,12 +175,16 @@ import yaml
 
 path = Path(sys.argv[1])
 data = yaml.safe_load(path.read_text(encoding="utf-8"))
+if not isinstance(data, dict):
+    raise SystemExit(f"{path}: deploy YAML must be a mapping")
 containers = (
     data.get("spec", {})
     .get("template", {})
     .get("spec", {})
     .get("containers", [])
 )
+if not isinstance(containers, list):
+    raise SystemExit(f"{path}: deploy spec.template.spec.containers must be a list")
 if not any(container.get("args") == ["start"] for container in containers if isinstance(container, dict)):
     raise SystemExit(f'{path}: deploy container args must be ["start"]')
 PY
@@ -167,7 +196,9 @@ PY
       require "yaml"
       path = ARGV[0]
       data = YAML.safe_load(File.read(path), permitted_classes: [], permitted_symbols: [], aliases: true)
+      abort("#{path}: deploy YAML must be a mapping") unless data.is_a?(Hash)
       containers = data.dig("spec", "template", "spec", "containers") || []
+      abort("#{path}: deploy spec.template.spec.containers must be a list") unless containers.is_a?(Array)
       ok = containers.any? { |container| container.is_a?(Hash) && container["args"] == ["start"] }
       abort("#{path}: deploy container args must be [\"start\"]") unless ok
     ' "$file"

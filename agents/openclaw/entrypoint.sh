@@ -29,8 +29,13 @@ run_as_agent() {
 
 ensure_agent_ownership() {
   if [[ "$(id -u)" -eq 0 ]]; then
-    chown -R agent:agent "$OPENCLAW_STATE_DIR"
-    chown agent:agent "$OPENCLAW_WORKSPACE"
+    if [[ -e "$OPENCLAW_STATE_DIR" ]] && [[ "$(stat -c '%U:%G' "$OPENCLAW_STATE_DIR")" != "agent:agent" ]]; then
+      chown agent:agent "$OPENCLAW_STATE_DIR"
+    fi
+    find "$OPENCLAW_STATE_DIR" -mindepth 1 -maxdepth 1 \( ! -user agent -o ! -group agent \) -exec chown agent:agent {} +
+    if [[ -e "$OPENCLAW_WORKSPACE" ]] && [[ "$(stat -c '%U:%G' "$OPENCLAW_WORKSPACE")" != "agent:agent" ]]; then
+      chown agent:agent "$OPENCLAW_WORKSPACE"
+    fi
   fi
 }
 

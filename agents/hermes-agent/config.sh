@@ -77,7 +77,7 @@ require_arg() {
 run_as_agent_script() {
   if [[ "$(id -u)" -eq 0 ]] && [[ "${HERMES_CONFIG_AS_AGENT:-1}" == "1" ]]; then
     ensure_hermes_state
-    chown -R agent:agent "$HERMES_HOME"
+    ensure_agent_ownership
     exec runuser -u agent -- env \
       HERMES_CONFIG_AS_AGENT=0 \
       AGENT_NAME="$AGENT_NAME" \
@@ -89,6 +89,13 @@ run_as_agent_script() {
       HOME=/home/agent \
       /opt/agent/config.sh "$@"
   fi
+}
+
+ensure_agent_ownership() {
+  if [[ -e "$HERMES_HOME" ]] && [[ "$(stat -c '%U:%G' "$HERMES_HOME")" != "agent:agent" ]]; then
+    chown agent:agent "$HERMES_HOME"
+  fi
+  find "$HERMES_HOME" -mindepth 1 -maxdepth 1 \( ! -user agent -o ! -group agent \) -exec chown agent:agent {} +
 }
 
 ensure_hermes_state() {

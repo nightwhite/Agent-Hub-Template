@@ -59,8 +59,7 @@ require_arg() {
 run_as_agent_script() {
   if [[ "$(id -u)" -eq 0 ]] && [[ "${OPENCLAW_CONFIG_AS_AGENT:-1}" == "1" ]]; then
     ensure_openclaw_state
-    chown -R agent:agent "$OPENCLAW_STATE_DIR"
-    chown agent:agent "$OPENCLAW_WORKSPACE"
+    ensure_agent_ownership
     exec runuser -u agent -- env \
       OPENCLAW_CONFIG_AS_AGENT=0 \
       AGENT_NAME="$AGENT_NAME" \
@@ -73,6 +72,16 @@ run_as_agent_script() {
       HOME=/home/agent \
       PATH="$PATH" \
       /opt/agent/config.sh "$@"
+  fi
+}
+
+ensure_agent_ownership() {
+  if [[ -e "$OPENCLAW_STATE_DIR" ]] && [[ "$(stat -c '%U:%G' "$OPENCLAW_STATE_DIR")" != "agent:agent" ]]; then
+    chown agent:agent "$OPENCLAW_STATE_DIR"
+  fi
+  find "$OPENCLAW_STATE_DIR" -mindepth 1 -maxdepth 1 \( ! -user agent -o ! -group agent \) -exec chown agent:agent {} +
+  if [[ -e "$OPENCLAW_WORKSPACE" ]] && [[ "$(stat -c '%U:%G' "$OPENCLAW_WORKSPACE")" != "agent:agent" ]]; then
+    chown agent:agent "$OPENCLAW_WORKSPACE"
   fi
 }
 

@@ -29,7 +29,10 @@ run_as_agent() {
 
 ensure_agent_ownership() {
   if [[ "$(id -u)" -eq 0 ]]; then
-    chown -R agent:agent "$HERMES_HOME"
+    if [[ -e "$HERMES_HOME" ]] && [[ "$(stat -c '%U:%G' "$HERMES_HOME")" != "agent:agent" ]]; then
+      chown agent:agent "$HERMES_HOME"
+    fi
+    find "$HERMES_HOME" -mindepth 1 -maxdepth 1 \( ! -user agent -o ! -group agent \) -exec chown agent:agent {} +
   fi
 }
 
