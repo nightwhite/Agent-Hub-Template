@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: cowagent
-          image: ghcr.io/gitlayzer/cowagent:dev
+          image: ghcr.io/gitlayzer/cowagent:dev-7679be68c264
           imagePullPolicy: IfNotPresent
           args: ["start"]
           workingDir: /workspace
