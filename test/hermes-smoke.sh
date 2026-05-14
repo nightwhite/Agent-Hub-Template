@@ -73,7 +73,7 @@ trap cleanup EXIT
 verify_ai_agent_switch_agent_hub() {
   local output
   output="$(
-    docker run --rm "$IMAGE" bash -lc '
+    docker run --rm --platform "$DOCKER_PLATFORM" "$IMAGE" bash -lc '
       set -euo pipefail
       verify_home="$(mktemp -d)"
       trap "rm -rf \"$verify_home\"" EXIT
@@ -102,8 +102,8 @@ docker build \
   -t "$IMAGE" \
   .
 
-docker run --rm "$IMAGE" ai-agent-switch --version | grep -F "ai-agent-switch/${AI_AGENT_SWITCH_VERSION}" >/dev/null
-docker run --rm "$IMAGE" ai-agent-switch client list --json >/dev/null
+docker run --rm --platform "$DOCKER_PLATFORM" "$IMAGE" ai-agent-switch --version | grep -F "ai-agent-switch/${AI_AGENT_SWITCH_VERSION}" >/dev/null
+docker run --rm --platform "$DOCKER_PLATFORM" "$IMAGE" ai-agent-switch client list --json >/dev/null
 verify_ai_agent_switch_agent_hub
 
 printf '==> starting %s\n' "$CONTAINER"
