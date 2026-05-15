@@ -93,7 +93,7 @@ PY
   fi
 
   if command -v ruby >/dev/null 2>&1; then
-    ruby -e 'require "yaml"; docs = YAML.load_stream(File.read(ARGV[0])); abort("#{ARGV[0]}: YAML must contain at least one document") if docs.empty?' "$file" >/dev/null
+    ruby -e 'require "yaml"; docs = YAML.load_stream(File.read(ARGV[0])); abort("#{ARGV[0]}: YAML must contain at least one mapping document") unless docs.any? { |doc| doc.is_a?(Hash) }' "$file" >/dev/null
     return
   fi
 
@@ -221,8 +221,10 @@ for agent_dir in "${agents[@]}"; do
       fail "$agent_dir/install.sh must support explicit ai-agent-switch source builds"
     grep -F 'install_ai_agent_switch_from_source' "$agent_dir/install.sh" >/dev/null || \
       fail "$agent_dir/install.sh must build ai-agent-switch from explicit source when requested"
-    grep -F 'bun run npm:build-package -- --platform linux-x64' "$agent_dir/install.sh" >/dev/null || \
-      fail "$agent_dir/install.sh must build the linux ai-agent-switch package from source"
+    grep -F 'target="linux-$(uname -m' "$agent_dir/install.sh" >/dev/null || \
+      fail "$agent_dir/install.sh must detect ai-agent-switch source build target"
+    grep -F 'bun run npm:build-package -- --platform "$target"' "$agent_dir/install.sh" >/dev/null || \
+      fail "$agent_dir/install.sh must build ai-agent-switch from source for the detected target"
     grep -F 'ai-agent-switch client list --json' "$agent_dir/install.sh" >/dev/null || \
       fail "$agent_dir/install.sh must verify ai-agent-switch client list"
     grep -F 'verify_ai_agent_switch_agent_hub' "$agent_dir/install.sh" >/dev/null || \

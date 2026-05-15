@@ -63,6 +63,8 @@ install_ai_agent_switch() {
 install_ai_agent_switch_from_source() {
   local src_dir
   local package_dir
+  local target
+  target="linux-$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/')"
   src_dir="$(mktemp -d)"
   git init "$src_dir"
   (
@@ -72,9 +74,9 @@ install_ai_agent_switch_from_source() {
     git checkout --detach FETCH_HEAD
     npm install -g bun
     bun install --frozen-lockfile
-    bun run npm:build-package -- --platform linux-x64 --out-dir dist/npm-packages --version "$AI_AGENT_SWITCH_VERSION"
+    bun run npm:build-package -- --platform "$target" --out-dir dist/npm-packages --version "$AI_AGENT_SWITCH_VERSION"
   )
-  package_dir="$src_dir/dist/npm-packages/ai-agent-switch-linux-x64"
+  package_dir="$src_dir/dist/npm-packages/ai-agent-switch-$target"
   [[ -x "$package_dir/ai-agent-switch" ]] || fail "ai-agent-switch source binary was not built"
   install -m 0755 "$package_dir/ai-agent-switch" /usr/local/bin/ai-agent-switch
   rm -rf "$src_dir"

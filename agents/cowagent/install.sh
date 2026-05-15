@@ -77,6 +77,8 @@ install_ai_agent_switch() {
 install_ai_agent_switch_from_source() {
   local src_dir
   local package_dir
+  local target
+  target="linux-$(uname -m | sed 's/x86_64/x64/;s/aarch64/arm64/')"
   src_dir="$(mktemp -d)"
   git init "$src_dir"
   (
@@ -86,9 +88,9 @@ install_ai_agent_switch_from_source() {
     git checkout --detach FETCH_HEAD
     npm install -g bun
     bun install --frozen-lockfile
-    bun run npm:build-package -- --platform linux-x64 --out-dir dist/npm-packages --version "$AI_AGENT_SWITCH_VERSION"
+    bun run npm:build-package -- --platform "$target" --out-dir dist/npm-packages --version "$AI_AGENT_SWITCH_VERSION"
   )
-  package_dir="$src_dir/dist/npm-packages/ai-agent-switch-linux-x64"
+  package_dir="$src_dir/dist/npm-packages/ai-agent-switch-$target"
   [[ -x "$package_dir/ai-agent-switch" ]] || fail "ai-agent-switch source binary was not built"
   install -m 0755 "$package_dir/ai-agent-switch" /usr/local/bin/ai-agent-switch
   rm -rf "$src_dir"
@@ -133,18 +135,18 @@ install_cowagent_runtime() {
   mkdir -p /opt/cowagent "$COWAGENT_HOME" "${AGENT_HOME}/bin"
 
   python3 -m venv "$COWAGENT_VENV"
-  "$COWAGENT_VENV/bin/python" -m pip install --upgrade pip setuptools wheel
-  "$COWAGENT_VENV/bin/pip" install -r "${COWAGENT_SRC}/requirements.txt"
+  "$COWAGENT_VENV/bin/python" -m pip install --no-cache-dir --upgrade pip setuptools wheel
+  "$COWAGENT_VENV/bin/pip" install --no-cache-dir -r "${COWAGENT_SRC}/requirements.txt"
 
   if [[ "$COWAGENT_INSTALL_OPTIONAL" == "true" ]]; then
-    "$COWAGENT_VENV/bin/pip" install -r "${COWAGENT_SRC}/requirements-optional.txt"
+    "$COWAGENT_VENV/bin/pip" install --no-cache-dir -r "${COWAGENT_SRC}/requirements-optional.txt"
   fi
 
   if [[ "$COWAGENT_INSTALL_AGENTMESH" == "true" ]]; then
-    "$COWAGENT_VENV/bin/pip" install "agentmesh-sdk>=0.1.3"
+    "$COWAGENT_VENV/bin/pip" install --no-cache-dir "agentmesh-sdk>=0.1.3"
   fi
 
-  "$COWAGENT_VENV/bin/pip" install -e "$COWAGENT_SRC"
+  "$COWAGENT_VENV/bin/pip" install --no-cache-dir -e "$COWAGENT_SRC"
 
   if [[ "$COWAGENT_INSTALL_BROWSER" == "true" ]]; then
     PLAYWRIGHT_BROWSERS_PATH=/opt/cowagent/ms-playwright "$COWAGENT_VENV/bin/cow" install-browser
