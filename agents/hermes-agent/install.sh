@@ -8,10 +8,6 @@ HERMES_HOME="${HERMES_HOME:-/home/agent/.hermes}"
 HERMES_SRC="${HERMES_SRC:-/opt/hermes/src}"
 HERMES_VENV="${HERMES_VENV:-/opt/hermes/venv}"
 AGENT_HOME="${AGENT_HOME:-/opt/agent}"
-NODE_MAJOR="${NODE_MAJOR:-22}"
-AI_AGENT_SWITCH_VERSION="${AI_AGENT_SWITCH_VERSION:-}"
-AI_AGENT_SWITCH_SOURCE_URL="${AI_AGENT_SWITCH_SOURCE_URL:-}"
-AI_AGENT_SWITCH_SOURCE_REF="${AI_AGENT_SWITCH_SOURCE_REF:-}"
 UV_BIN="${UV_BIN:-/root/.local/bin/uv}"
 UV_PYTHON_INSTALL_DIR="${UV_PYTHON_INSTALL_DIR:-/opt/uv/python}"
 
@@ -56,77 +52,8 @@ install_system_packages() {
     curl \
     ffmpeg \
     git \
-    gnupg \
     ripgrep
   rm -rf /var/lib/apt/lists/*
-}
-
-install_node() {
-  if command -v npm >/dev/null 2>&1; then
-    return
-  fi
-
-  curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR}.x" | bash -
-  apt-get install -y --no-install-recommends nodejs
-  npm --version >/dev/null 2>&1 || fail "npm was not installed successfully"
-}
-
-install_ai_agent_switch() {
-  [[ -n "$AI_AGENT_SWITCH_VERSION" ]] || fail "AI_AGENT_SWITCH_VERSION is required"
-  install_node
-  if [[ -n "$AI_AGENT_SWITCH_SOURCE_URL" ]]; then
-    install_ai_agent_switch_from_source
-  else
-    npm install -g "ai-agent-switch@${AI_AGENT_SWITCH_VERSION}"
-  fi
-  command -v ai-agent-switch >/dev/null 2>&1 || fail "ai-agent-switch CLI was not installed"
-  ai-agent-switch --version >/dev/null 2>&1 || fail "ai-agent-switch CLI is not executable"
-  ai-agent-switch client list --json >/dev/null || fail "ai-agent-switch client list failed"
-  verify_ai_agent_switch_agent_hub
-}
-
-install_ai_agent_switch_from_source() {
-  local src_dir
-  local package_dir
-  src_dir="$(mktemp -d)"
-  git init "$src_dir"
-  (
-    cd "$src_dir"
-    git remote add origin "$AI_AGENT_SWITCH_SOURCE_URL"
-    git fetch --depth 1 origin "${AI_AGENT_SWITCH_SOURCE_REF:-HEAD}"
-    git checkout --detach FETCH_HEAD
-    npm install -g bun
-    bun install --frozen-lockfile
-    bun run npm:build-package -- --platform linux-x64 --out-dir dist/npm-packages --version "$AI_AGENT_SWITCH_VERSION"
-  )
-  package_dir="$src_dir/dist/npm-packages/ai-agent-switch-linux-x64"
-  [[ -x "$package_dir/ai-agent-switch" ]] || fail "ai-agent-switch source binary was not built"
-  install -m 0755 "$package_dir/ai-agent-switch" /usr/local/bin/ai-agent-switch
-  rm -rf "$src_dir"
-}
-
-verify_ai_agent_switch_agent_hub() {
-  local verify_home
-  local output
-  verify_home="$(mktemp -d)"
-  output="$(
-    HOME="$verify_home" ai-agent-switch agent-hub init \
-      --client hermes \
-      --provider-id verify-aiproxy \
-      --provider-name Verify \
-      --model-type openai-chat-compatible \
-      --base-url http://127.0.0.1:1/v1 \
-      --api-key-env AIPROXY_API_KEY \
-      --model verify-model \
-      --available-model verify-model \
-      --json
-  )" || {
-    rm -rf "$verify_home"
-    fail "ai-agent-switch agent-hub init verification failed"
-  }
-  rm -rf "$verify_home"
-  printf '%s' "$output" | grep -F '"requiresConfirmation": true' >/dev/null || \
-    fail "ai-agent-switch agent-hub init did not return the expected dry-run JSON"
 }
 
 install_uv() {
@@ -214,7 +141,7 @@ if [[ "$#" -eq 0 ]]; then
 fi
 
 case "$1" in
-  hermes|ai-agent-switch|node|npm|python|python3|bash|sh)
+  hermes|python|python3|bash|sh)
     exec "$@"
     ;;
   *)
@@ -230,7 +157,6 @@ install_agent() {
   prepare_install_env
   install_system_packages
   install_uv
-  install_ai_agent_switch
   checkout_hermes_source
   install_hermes_runtime
   write_default_config
