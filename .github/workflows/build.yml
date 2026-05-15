@@ -44,8 +44,8 @@ jobs:
         id: ai-agent-switch
         env:
           EVENT_NAME: ${{ github.event_name }}
-          SOURCE_URL_INPUT: ${{ inputs.ai_agent_switch_source_url || '' }}
-          SOURCE_REF_INPUT: ${{ inputs.ai_agent_switch_source_ref || '' }}
+          SOURCE_URL_INPUT: ${{ github.event.inputs.ai_agent_switch_source_url || '' }}
+          SOURCE_REF_INPUT: ${{ github.event.inputs.ai_agent_switch_source_ref || '' }}
         run: |
           version="$(npm view ai-agent-switch version)"
           if [ -z "$version" ]; then
