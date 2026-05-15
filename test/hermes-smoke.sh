@@ -5,6 +5,7 @@ IMAGE="${IMAGE:-agent-hub/hermes-agent:local}"
 CONTAINER="${CONTAINER:-hermes-smoke-$RANDOM}"
 HOST_PORT="${HOST_PORT:-28642}"
 DOCKER_PLATFORM="${DOCKER_PLATFORM:-linux/amd64}"
+HERMES_API_SERVER_KEY="${HERMES_API_SERVER_KEY:-hermes-smoke-local-token}"
 
 fail() {
   printf '[ERROR] %s\n' "$*" >&2
@@ -112,6 +113,7 @@ docker run -d \
   --add-host host.docker.internal:host-gateway \
   --name "$CONTAINER" \
   -p "127.0.0.1:${HOST_PORT}:8642" \
+  -e "API_SERVER_KEY=${HERMES_API_SERVER_KEY}" \
   "${docker_proxy_env[@]+"${docker_proxy_env[@]}"}" \
   "$IMAGE" >/dev/null
 
@@ -119,7 +121,7 @@ printf '==> waiting for Hermes API server\n'
 ready=0
 for _ in $(seq 1 30); do
   if curl --noproxy '*' -fsS --max-time 2 "http://127.0.0.1:${HOST_PORT}/v1/models" \
-    -H 'Authorization: Bearer change-me-local-dev' >/dev/null 2>&1; then
+    -H "Authorization: Bearer ${HERMES_API_SERVER_KEY}" >/dev/null 2>&1; then
     ready=1
     break
   fi

@@ -93,7 +93,7 @@ PY
   fi
 
   if command -v ruby >/dev/null 2>&1; then
-    ruby -e 'require "yaml"; docs = YAML.load_stream(File.read(ARGV[0])); abort("#{ARGV[0]}: YAML must contain at least one mapping document") unless docs.any? { |doc| doc.is_a?(Hash) }' "$file" >/dev/null
+    ruby -e 'require "yaml"; stream = Psych.parse_stream(File.read(ARGV[0])); abort("#{ARGV[0]}: YAML must contain at least one mapping document") unless stream.children.any? { |doc| doc.root.is_a?(Psych::Nodes::Mapping) }' "$file" >/dev/null
     return
   fi
 
@@ -139,8 +139,8 @@ validate_dockerfile_contract() {
       fail "$file must label org.sealos.ai-agent-switch.version"
   fi
 
-  if grep -Eq 'COPY[[:space:]].*(config\.json|config\.sh)' "$file"; then
-    fail "$file must not copy config.sh or config.json"
+  if grep -Eq '(COPY|ADD)[[:space:]].*(config\.json|config\.sh)' "$file"; then
+    fail "$file must not copy or add config.sh or config.json"
   fi
 }
 

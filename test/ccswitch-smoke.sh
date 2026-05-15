@@ -14,6 +14,8 @@ CCSWITCH_CONTAINER_BASE_URL="${CCSWITCH_CONTAINER_BASE_URL:-http://host.docker.i
 CCSWITCH_API_KEY="${CCSWITCH_API_KEY:-sk-local-smoke}"
 CCSWITCH_MODEL="${CCSWITCH_MODEL:-gpt-5.4-mini}"
 OPENCLAW_INFER_TIMEOUT_SECONDS="${OPENCLAW_INFER_TIMEOUT_SECONDS:-240}"
+HERMES_API_SERVER_KEY="${HERMES_API_SERVER_KEY:-hermes-ccswitch-smoke-token}"
+OPENCLAW_GATEWAY_TOKEN="${OPENCLAW_GATEWAY_TOKEN:-openclaw-ccswitch-smoke-token}"
 
 fail() {
   printf '[ERROR] %s\n' "$*" >&2
@@ -112,7 +114,7 @@ wait_for_hermes() {
   local ready=0
   for _ in $(seq 1 45); do
     if curl --noproxy '*' -fsS --max-time 2 "http://127.0.0.1:${HERMES_HOST_PORT}/v1/models" \
-      -H 'Authorization: Bearer change-me-local-dev' >/dev/null 2>&1; then
+      -H "Authorization: Bearer ${HERMES_API_SERVER_KEY}" >/dev/null 2>&1; then
       ready=1
       break
     fi
@@ -272,6 +274,7 @@ docker run -d \
   -e "CCSWITCH_API_KEY=${CCSWITCH_API_KEY}" \
   -e "CCSWITCH_CONTAINER_BASE_URL=${CCSWITCH_CONTAINER_BASE_URL}" \
   -e "CCSWITCH_MODEL=${CCSWITCH_MODEL}" \
+  -e "API_SERVER_KEY=${HERMES_API_SERVER_KEY}" \
   "${docker_proxy_env[@]+"${docker_proxy_env[@]}"}" \
   "$HERMES_IMAGE" \
   bash -lc '
@@ -295,7 +298,7 @@ docker exec "$HERMES_CONTAINER" ai-agent-switch client show hermes --json | pyth
 hermes_output="$(mktemp)"
 curl --noproxy '*' -fsS --max-time 90 "http://127.0.0.1:${HERMES_HOST_PORT}/v1/chat/completions" \
   -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer change-me-local-dev' \
+  -H "Authorization: Bearer ${HERMES_API_SERVER_KEY}" \
   -d '{"model":"'"${CCSWITCH_MODEL}"'","messages":[{"role":"user","content":"Reply with exactly: pong"}],"max_tokens":16}' \
   >"$hermes_output"
 assert_chat_completion_text "$hermes_output" "hermes_gateway"
@@ -310,6 +313,7 @@ docker run -d \
   -e "CCSWITCH_API_KEY=${CCSWITCH_API_KEY}" \
   -e "CCSWITCH_CONTAINER_BASE_URL=${CCSWITCH_CONTAINER_BASE_URL}" \
   -e "CCSWITCH_MODEL=${CCSWITCH_MODEL}" \
+  -e "OPENCLAW_GATEWAY_TOKEN=${OPENCLAW_GATEWAY_TOKEN}" \
   "${docker_proxy_env[@]+"${docker_proxy_env[@]}"}" \
   "$OPENCLAW_IMAGE" \
   bash -lc '

@@ -57,6 +57,6 @@ WORKDIR ${AGENT_WORKSPACE}
 VOLUME ["/workspace", "/home/agent/.hermes"]
 EXPOSE 8642
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-  CMD curl -fsS -H "Authorization: Bearer ${API_SERVER_KEY:-change-me-local-dev}" "http://127.0.0.1:${API_SERVER_PORT:-8642}/v1/models" >/dev/null || exit 1
+  CMD test -n "$API_SERVER_KEY" && curl -fsS -H "Authorization: Bearer ${API_SERVER_KEY}" "http://127.0.0.1:${API_SERVER_PORT:-8642}/v1/models" >/dev/null || exit 1
 ENTRYPOINT ["/init", "/opt/agent/entrypoint.sh"]
 CMD ["start"]

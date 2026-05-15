@@ -207,11 +207,37 @@ export PATH="${HERMES_VENV}/bin:${PATH}"
 export API_SERVER_ENABLED="${API_SERVER_ENABLED:-true}"
 export API_SERVER_HOST="${API_SERVER_HOST:-0.0.0.0}"
 export API_SERVER_PORT="${API_SERVER_PORT:-${AGENT_PORT:-8642}}"
-export API_SERVER_KEY="${API_SERVER_KEY:-change-me-local-dev}"
 
 mkdir -p "$HERMES_HOME" "${AGENT_WORKSPACE:-/workspace}"
 
 if [[ "$#" -eq 0 ]]; then
+  : "${API_SERVER_KEY:?API_SERVER_KEY is required}"
+
+  if [[ ! -f "${HERMES_HOME}/config.yaml" ]]; then
+    cat >"${HERMES_HOME}/config.yaml" <<'CFG'
+model:
+  default: gpt-5.4
+  provider: auto
+display:
+  skin: default
+terminal:
+  backend: local
+CFG
+  fi
+
+  if [[ ! -f "${HERMES_HOME}/.env" ]]; then
+    cat >"${HERMES_HOME}/.env" <<'ENVFILE'
+# Put Hermes provider credentials here, for example:
+# OPENAI_API_KEY=
+# OPENROUTER_API_KEY=
+# ANTHROPIC_API_KEY=
+API_SERVER_ENABLED=true
+API_SERVER_HOST=0.0.0.0
+API_SERVER_PORT=8642
+# API_SERVER_KEY must be supplied at runtime through env or Kubernetes Secret.
+ENVFILE
+  fi
+
   exec hermes gateway run
 fi
 

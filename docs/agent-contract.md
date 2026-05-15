@@ -82,4 +82,5 @@ environment variables, Kubernetes Secret, ConfigMap, or mounted files.
 - `/workspace` as the working directory
 
 Do not mount an empty directory over a path that contains required default
-configuration unless the mount also provides replacement files.
+configuration unless the mount provides replacement files or `/opt/agent/bin/start`
+bootstraps the required files before launching the runtime.

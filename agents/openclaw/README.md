@@ -32,6 +32,8 @@ docker run --rm -p 127.0.0.1:28789:18789 agent-hub/openclaw:dev
 docker run --rm -p 127.0.0.1:28789:18789 agent-hub/openclaw:dev start
 ```
 
+生产部署必须通过运行时环境变量或 Kubernetes Secret 提供 `OPENCLAW_GATEWAY_TOKEN`。
+
 镜像内部固定执行：
 
 ```bash
@@ -109,6 +111,7 @@ docker run -d \
   --name openclaw-local \
   -p 127.0.0.1:28789:18789 \
   -v "$PWD/.tmp/openclaw-home:/home/agent/.openclaw" \
+  -e OPENCLAW_GATEWAY_TOKEN=sk-local-openclaw \
   -e CCSWITCH_API_KEY=sk-local-test \
   agent-hub/openclaw:dev \
   bash -lc '

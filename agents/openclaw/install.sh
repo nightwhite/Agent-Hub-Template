@@ -9,7 +9,6 @@ AI_AGENT_SWITCH_SOURCE_REF="${AI_AGENT_SWITCH_SOURCE_REF:-}"
 OPENCLAW_STATE_DIR="${OPENCLAW_STATE_DIR:-/home/agent/.openclaw}"
 OPENCLAW_CONFIG_PATH="${OPENCLAW_CONFIG_PATH:-${OPENCLAW_STATE_DIR}/openclaw.json}"
 OPENCLAW_WORKSPACE="${OPENCLAW_WORKSPACE:-/workspace}"
-OPENCLAW_GATEWAY_TOKEN="${OPENCLAW_GATEWAY_TOKEN:-change-me-local-dev}"
 OPENCLAW_PLUGIN_STAGE_DIR="${OPENCLAW_PLUGIN_STAGE_DIR:-/opt/openclaw/plugin-runtime-deps}"
 AGENT_HOME="${AGENT_HOME:-/opt/agent}"
 
@@ -144,12 +143,6 @@ write_default_state() {
 }
 EOF_JSON
   fi
-
-  if [[ ! -f "${OPENCLAW_STATE_DIR}/.env" ]]; then
-    cat >"${OPENCLAW_STATE_DIR}/.env" <<EOF_ENV
-OPENCLAW_GATEWAY_TOKEN=${OPENCLAW_GATEWAY_TOKEN}
-EOF_ENV
-  fi
 }
 
 install_agent_start() {
@@ -168,6 +161,49 @@ export PATH="/usr/local/bin:${PATH}"
 mkdir -p "$OPENCLAW_STATE_DIR" "$OPENCLAW_WORKSPACE" "$OPENCLAW_PLUGIN_STAGE_DIR"
 
 if [[ "$#" -eq 0 ]]; then
+  : "${OPENCLAW_GATEWAY_TOKEN:?OPENCLAW_GATEWAY_TOKEN is required}"
+
+  if [[ ! -f "${OPENCLAW_STATE_DIR}/.env" ]]; then
+    umask 077
+    printf 'OPENCLAW_GATEWAY_TOKEN=%s\n' "$OPENCLAW_GATEWAY_TOKEN" >"${OPENCLAW_STATE_DIR}/.env"
+  fi
+
+  if [[ ! -f "$OPENCLAW_CONFIG_PATH" ]]; then
+    cat >"$OPENCLAW_CONFIG_PATH" <<EOF_JSON
+{
+  "gateway": {
+    "mode": "local",
+    "bind": "lan",
+    "port": 18789,
+    "auth": {
+      "mode": "token"
+    }
+  },
+  "agents": {
+    "defaults": {
+      "workspace": "${OPENCLAW_WORKSPACE}",
+      "model": {
+        "primary": "openai/gpt-5.4"
+      }
+    }
+  },
+  "plugins": {
+    "entries": {
+      "acpx": {
+        "enabled": false
+      },
+      "bonjour": {
+        "enabled": false
+      },
+      "browser": {
+        "enabled": false
+      }
+    }
+  }
+}
+EOF_JSON
+  fi
+
   exec env \
     OPENCLAW_NO_RESPAWN=1 \
     OPENCLAW_SKIP_CHANNELS="${OPENCLAW_SKIP_CHANNELS:-1}" \

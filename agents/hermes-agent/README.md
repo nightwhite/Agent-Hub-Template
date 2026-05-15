@@ -30,6 +30,8 @@ docker run --rm -p 127.0.0.1:28642:8642 agent-hub/hermes-agent:dev
 docker run --rm -p 127.0.0.1:28642:8642 agent-hub/hermes-agent:dev start
 ```
 
+生产部署必须通过运行时环境变量或 Kubernetes Secret 提供 `API_SERVER_KEY`。
+
 镜像内部固定执行：
 
 ```bash
@@ -99,6 +101,7 @@ docker run -d \
   --name hermes-local \
   -p 127.0.0.1:28642:8642 \
   -v "$PWD/.tmp/hermes-home:/home/agent/.hermes" \
+  -e API_SERVER_KEY=sk-local-hermes \
   -e CCSWITCH_API_KEY=sk-local-test \
   agent-hub/hermes-agent:dev \
   bash -lc '

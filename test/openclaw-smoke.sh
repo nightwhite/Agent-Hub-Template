@@ -5,6 +5,7 @@ IMAGE="${IMAGE:-agent-hub/openclaw:local}"
 CONTAINER="${CONTAINER:-openclaw-smoke-$RANDOM}"
 HOST_PORT="${HOST_PORT:-28789}"
 DOCKER_PLATFORM="${DOCKER_PLATFORM:-linux/amd64}"
+OPENCLAW_GATEWAY_TOKEN="${OPENCLAW_GATEWAY_TOKEN:-openclaw-smoke-local-token}"
 
 fail() {
   printf '[ERROR] %s\n' "$*" >&2
@@ -112,6 +113,7 @@ docker run -d \
   --add-host host.docker.internal:host-gateway \
   --name "$CONTAINER" \
   -p "127.0.0.1:${HOST_PORT}:18789" \
+  -e "OPENCLAW_GATEWAY_TOKEN=${OPENCLAW_GATEWAY_TOKEN}" \
   "${docker_proxy_env[@]+"${docker_proxy_env[@]}"}" \
   "$IMAGE" >/dev/null
 
