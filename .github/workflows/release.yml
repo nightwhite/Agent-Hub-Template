@@ -21,6 +21,9 @@ jobs:
       matrix: ${{ steps.matrix.outputs.matrix }}
       count: ${{ steps.matrix.outputs.count }}
       owner: ${{ steps.owner.outputs.owner }}
+      ai-agent-switch-version: ${{ steps.ai-agent-switch.outputs.version }}
+      ai-agent-switch-source-url: ${{ steps.ai-agent-switch.outputs.source-url }}
+      ai-agent-switch-source-ref: ${{ steps.ai-agent-switch.outputs.source-ref }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -31,6 +34,18 @@ jobs:
       - name: Resolve owner
         id: owner
         run: echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve ai-agent-switch version
+        id: ai-agent-switch
+        run: |
+          version="$(npm view ai-agent-switch version)"
+          if [ -z "$version" ]; then
+            echo "failed to resolve ai-agent-switch version" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "source-url=" >> "$GITHUB_OUTPUT"
+          echo "source-ref=" >> "$GITHUB_OUTPUT"
 
       - name: Generate agent matrix from registry
         id: matrix
@@ -141,6 +156,9 @@ jobs:
           done <<< "$IMAGE_TAGS"
 
           docker build \
+            --build-arg "AI_AGENT_SWITCH_VERSION=${{ needs.prepare.outputs['ai-agent-switch-version'] }}" \
+            --build-arg "AI_AGENT_SWITCH_SOURCE_URL=${{ needs.prepare.outputs['ai-agent-switch-source-url'] }}" \
+            --build-arg "AI_AGENT_SWITCH_SOURCE_REF=${{ needs.prepare.outputs['ai-agent-switch-source-ref'] }}" \
             --file "${{ matrix.path }}/Dockerfile" \
             "${tag_args[@]}" \
             .

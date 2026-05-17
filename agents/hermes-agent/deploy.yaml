@@ -28,7 +28,10 @@ spec:
             - name: API_SERVER_PORT
               value: "8642"
             - name: API_SERVER_KEY
-              value: "change-me-local-dev"
+              valueFrom:
+                secretKeyRef:
+                  name: hermes-agent-secrets
+                  key: api-server-key
             - name: AGENT_PORT
               value: "8642"
             - name: AGENT_LOG_LEVEL

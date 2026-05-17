@@ -4,6 +4,8 @@ metadata:
   name: openclaw
   labels:
     app: openclaw
+    app.kubernetes.io/name: openclaw
+    app.kubernetes.io/component: agent
 spec:
   replicas: 1
   selector:
@@ -20,3 +22,42 @@ spec:
           imagePullPolicy: IfNotPresent
           args: ["start"]
           workingDir: /workspace
+          env:
+            - name: AGENT_PORT
+              value: "18789"
+            - name: AGENT_LOG_LEVEL
+              value: "info"
+            - name: OPENCLAW_GATEWAY_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: openclaw-secrets
+                  key: gateway-token
+          ports:
+            - name: http
+              containerPort: 18789
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+            - name: openclaw-data
+              mountPath: /home/agent/.openclaw
+      volumes:
+        - name: workspace
+          emptyDir: {}
+        - name: openclaw-data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: openclaw
+  labels:
+    app: openclaw
+    app.kubernetes.io/name: openclaw
+    app.kubernetes.io/component: agent
+spec:
+  selector:
+    app: openclaw
+  ports:
+    - name: http
+      port: 18789
+      targetPort: http

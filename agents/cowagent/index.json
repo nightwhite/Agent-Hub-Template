@@ -7,6 +7,7 @@
   "status": "ready",
   "image": "ghcr.io/nightwhite/cowagent:dev-a3ecdc5cec91",
   "base_image": "ghcr.io/gitlayzer/ubuntu:22.04-base",
+  "ai_agent_switch_version": "actions-resolved",
   "category": "platform-agent",
   "repo_path": "agents/cowagent",
   "readme": "agents/cowagent/README.md",

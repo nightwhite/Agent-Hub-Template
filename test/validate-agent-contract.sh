@@ -93,7 +93,7 @@ PY
   fi
 
   if command -v ruby >/dev/null 2>&1; then
-    ruby -e 'require "yaml"; docs = YAML.load_stream(File.read(ARGV[0])); abort("#{ARGV[0]}: YAML must contain at least one document") if docs.empty?' "$file" >/dev/null
+    ruby -e 'require "yaml"; stream = Psych.parse_stream(File.read(ARGV[0])); abort("#{ARGV[0]}: YAML must contain at least one mapping document") unless stream.children.any? { |doc| doc.root.is_a?(Psych::Nodes::Mapping) }' "$file" >/dev/null
     return
   fi
 
@@ -115,6 +115,8 @@ if kind not in {"service", "tool"}:
 for key in ("id", "name", "version", "image", "repo_path", "readme"):
     if not data.get(key):
         raise SystemExit(f"{path}: missing required key {key}")
+if data.get("id") != "_template" and not data.get("ai_agent_switch_version"):
+    raise SystemExit(f"{path}: missing required key ai_agent_switch_version")
 PY
 }
 
@@ -130,9 +132,15 @@ validate_dockerfile_contract() {
     fail "$file must keep the /init entrypoint"
   grep -Eq '^[[:space:]]*CMD[[:space:]]+\[[[:space:]]*"start"[[:space:]]*\]' "$file" || \
     fail "$file must default CMD to start"
+  if [[ "$agent_dir" != "agents/_template" ]]; then
+    grep -F 'ARG AI_AGENT_SWITCH_VERSION' "$file" >/dev/null || \
+      fail "$file must define ARG AI_AGENT_SWITCH_VERSION"
+    grep -F 'org.sealos.ai-agent-switch.version' "$file" >/dev/null || \
+      fail "$file must label org.sealos.ai-agent-switch.version"
+  fi
 
-  if grep -Eq 'COPY[[:space:]].*(config\.json|config\.sh)' "$file"; then
-    fail "$file must not copy config.sh or config.json"
+  if grep -Eq '(COPY|ADD)[[:space:]].*(config\.json|config\.sh)' "$file"; then
+    fail "$file must not copy or add config.sh or config.json"
   fi
 }
 
@@ -204,6 +212,39 @@ for agent_dir in "${agents[@]}"; do
 
   grep -F 'bin/start' "$agent_dir/install.sh" >/dev/null || \
     fail "$agent_dir/install.sh must create /opt/agent/bin/start"
+  if [[ "$agent_dir" != "agents/_template" ]]; then
+    grep -F 'AI_AGENT_SWITCH_VERSION is required' "$agent_dir/install.sh" >/dev/null || \
+      fail "$agent_dir/install.sh must require AI_AGENT_SWITCH_VERSION"
+    grep -F 'npm install -g "ai-agent-switch@${AI_AGENT_SWITCH_VERSION}"' "$agent_dir/install.sh" >/dev/null || \
+      fail "$agent_dir/install.sh must install ai-agent-switch from AI_AGENT_SWITCH_VERSION"
+    grep -F 'AI_AGENT_SWITCH_SOURCE_URL' "$agent_dir/install.sh" >/dev/null || \
+      fail "$agent_dir/install.sh must support explicit ai-agent-switch source builds"
+    grep -F 'install_ai_agent_switch_from_source' "$agent_dir/install.sh" >/dev/null || \
+      fail "$agent_dir/install.sh must build ai-agent-switch from explicit source when requested"
+    grep -F 'target="linux-$(uname -m' "$agent_dir/install.sh" >/dev/null || \
+      fail "$agent_dir/install.sh must detect ai-agent-switch source build target"
+    grep -F 'bun run npm:build-package -- --platform "$target"' "$agent_dir/install.sh" >/dev/null || \
+      fail "$agent_dir/install.sh must build ai-agent-switch from source for the detected target"
+    grep -F 'ai-agent-switch client list --json' "$agent_dir/install.sh" >/dev/null || \
+      fail "$agent_dir/install.sh must verify ai-agent-switch client list"
+    grep -F 'verify_ai_agent_switch_agent_hub' "$agent_dir/install.sh" >/dev/null || \
+      fail "$agent_dir/install.sh must verify ai-agent-switch agent-hub init with a dry-run command"
+    grep -F '"requiresConfirmation": true' "$agent_dir/install.sh" >/dev/null || \
+      fail "$agent_dir/install.sh must assert ai-agent-switch agent-hub dry-run JSON"
+    grep -F 'ai-agent-switch|' "$agent_dir/install.sh" >/dev/null || \
+      fail "$agent_dir/install.sh must allow direct ai-agent-switch execution from the image entrypoint"
+  fi
 done
+
+old_contract_refs="$(mktemp)"
+if grep -R --line-number -E 'agent-hub[[:space:]]+init-model|--provider-type|--request-format' \
+  .github agents test README.md docs \
+  --exclude=validate-agent-contract.sh \
+  --exclude-dir=superpowers >"$old_contract_refs"; then
+  cat "$old_contract_refs" >&2
+  rm -f "$old_contract_refs"
+  fail "old ai-agent-switch agent-hub init-model contract must not be used"
+fi
+rm -f "$old_contract_refs"
 
 printf '==> agent contract validation passed\n'
