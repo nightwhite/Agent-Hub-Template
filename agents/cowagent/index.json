@@ -5,7 +5,7 @@
   "desc": "Super AI assistant with Web console, skills, memory, tools, and multi-channel integrations.",
   "version": "2.0.8",
   "status": "ready",
-  "image": "ghcr.io/nightwhite/cowagent:dev-a3ecdc5cec91",
+  "image": "ghcr.io/nightwhite/cowagent:dev-554ae1c24724",
   "base_image": "ghcr.io/gitlayzer/ubuntu:22.04-base",
   "ai_agent_switch_version": "actions-resolved",
   "category": "platform-agent",
