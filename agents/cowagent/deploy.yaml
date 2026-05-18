@@ -18,7 +18,7 @@ spec:
     spec:
       containers:
         - name: cowagent
-          image: ghcr.io/nightwhite/cowagent:dev-554ae1c24724
+          image: ghcr.io/nightwhite/cowagent:dev-9be0d3087285
           imagePullPolicy: IfNotPresent
           args: ["start"]
           workingDir: /workspace
