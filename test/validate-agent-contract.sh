@@ -176,6 +176,20 @@ PY
   grep -F 'args: ["start"]' "$file" >/dev/null || fail "$file must set args: [\"start\"]"
 }
 
+validate_workflow_contracts() {
+  grep -F 'source_ref="9d78561ecbd35ce775f7acfe70e3bdb6617b9b51"' .github/workflows/build.yml >/dev/null || \
+    fail ".github/workflows/build.yml must build ai-agent-switch from the Agent Hub init source ref"
+  grep -F 'source_ref="9d78561ecbd35ce775f7acfe70e3bdb6617b9b51"' .github/workflows/release.yml >/dev/null || \
+    fail ".github/workflows/release.yml must build ai-agent-switch from the Agent Hub init source ref"
+  grep -F 'AI_AGENT_SWITCH_SOURCE_URL=${{ needs.prepare.outputs' .github/workflows/build.yml >/dev/null || \
+    fail ".github/workflows/build.yml must pass AI_AGENT_SWITCH_SOURCE_URL into docker build"
+  grep -F 'AI_AGENT_SWITCH_SOURCE_URL=${{ needs.prepare.outputs' .github/workflows/release.yml >/dev/null || \
+    fail ".github/workflows/release.yml must pass AI_AGENT_SWITCH_SOURCE_URL into docker build"
+  if grep -R --line-number -i -E '\[(skip ci|ci skip|skip actions|actions skip)\]' .github/workflows >/dev/null; then
+    fail "workflow-generated commits must not include skip-ci directives"
+  fi
+}
+
 required_files=(Dockerfile build.env install.sh entrypoint.sh index.json deploy.yaml README.md)
 forbidden_files=(config.sh config.json)
 entrypoint_ref="$(mktemp)"
@@ -235,6 +249,8 @@ for agent_dir in "${agents[@]}"; do
       fail "$agent_dir/install.sh must allow direct ai-agent-switch execution from the image entrypoint"
   fi
 done
+
+validate_workflow_contracts
 
 old_contract_refs="$(mktemp)"
 if grep -R --line-number -E 'agent-hub[[:space:]]+init-model|--provider-type|--request-format' \

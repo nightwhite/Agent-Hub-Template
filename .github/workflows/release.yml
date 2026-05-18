@@ -2,6 +2,15 @@ name: release-enabled-agents
 
 on:
   workflow_dispatch:
+    inputs:
+      ai_agent_switch_source_url:
+        description: Optional ai-agent-switch source repository URL.
+        required: false
+        default: ''
+      ai_agent_switch_source_ref:
+        description: Optional ai-agent-switch source ref. Required when source URL is set.
+        required: false
+        default: ''
   push:
     branches:
       - master
@@ -37,15 +46,33 @@ jobs:
 
       - name: Resolve ai-agent-switch version
         id: ai-agent-switch
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          SOURCE_URL_INPUT: ${{ github.event.inputs.ai_agent_switch_source_url || '' }}
+          SOURCE_REF_INPUT: ${{ github.event.inputs.ai_agent_switch_source_ref || '' }}
         run: |
           version="$(npm view ai-agent-switch version)"
           if [ -z "$version" ]; then
             echo "failed to resolve ai-agent-switch version" >&2
             exit 1
           fi
+          source_url="$SOURCE_URL_INPUT"
+          source_ref="$SOURCE_REF_INPUT"
+          if [ -z "$source_url" ] && { [ "$EVENT_NAME" = "push" ] || [ "$EVENT_NAME" = "workflow_dispatch" ]; }; then
+            source_url="https://github.com/sealos-apps/ai-agent-switch.git"
+            source_ref="9d78561ecbd35ce775f7acfe70e3bdb6617b9b51"
+          fi
+          if [ -n "$source_url" ] && [ -z "$source_ref" ]; then
+            echo "ai-agent-switch source ref is required when source url is set" >&2
+            exit 1
+          fi
+          if [ -z "$source_url" ] && [ -n "$source_ref" ]; then
+            echo "ai-agent-switch source url is required when source ref is set" >&2
+            exit 1
+          fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "source-url=" >> "$GITHUB_OUTPUT"
-          echo "source-ref=" >> "$GITHUB_OUTPUT"
+          echo "source-url=$source_url" >> "$GITHUB_OUTPUT"
+          echo "source-ref=$source_ref" >> "$GITHUB_OUTPUT"
 
       - name: Generate agent matrix from registry
         id: matrix
@@ -225,5 +252,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add agents/*/index.json agents/*/deploy.yaml
-          git commit -m "chore: sync dev agent image refs [skip ci]"
+          git commit -m "chore: sync dev agent image refs"
           git push origin "HEAD:${GITHUB_REF_NAME}"
