@@ -94,11 +94,9 @@ models.providers.ccswitch.api = "openai-completions"
 docker run --rm agent-hub/openclaw:dev ai-agent-switch client show openclaw --json
 ```
 
-### CLI 自检
+### Agent Hub 初始化命令自检
 
 ```bash
-docker run --rm agent-hub/openclaw:dev ai-agent-switch --version
-docker run --rm agent-hub/openclaw:dev ai-agent-switch client list --json
 docker run --rm agent-hub/openclaw:dev ai-agent-switch agent-hub init --help
 ```
 

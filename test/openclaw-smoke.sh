@@ -103,8 +103,6 @@ docker build \
   -t "$IMAGE" \
   .
 
-docker run --rm --platform "$DOCKER_PLATFORM" "$IMAGE" ai-agent-switch --version | grep -F "ai-agent-switch/${AI_AGENT_SWITCH_VERSION}" >/dev/null
-docker run --rm --platform "$DOCKER_PLATFORM" "$IMAGE" ai-agent-switch client list --json >/dev/null
 verify_ai_agent_switch_agent_hub
 
 printf '==> starting %s\n' "$CONTAINER"

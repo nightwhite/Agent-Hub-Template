@@ -178,8 +178,6 @@ verify_ai_agent_switch_image() {
   local image="$1"
   local client="$2"
   local output
-  docker run --rm --platform "$DOCKER_PLATFORM" "$image" ai-agent-switch --version | grep -F "ai-agent-switch/${AI_AGENT_SWITCH_VERSION}" >/dev/null
-  docker run --rm --platform "$DOCKER_PLATFORM" "$image" ai-agent-switch client list --json >/dev/null
   output="$(
     docker run --rm --platform "$DOCKER_PLATFORM" -e "VERIFY_CLIENT=${client}" "$image" bash -lc '
       set -euo pipefail

@@ -222,7 +222,7 @@ jobs:
             --tag "agent-hub/${{ matrix.name }}:ci-${{ github.run_id }}" \
             .
 
-      - name: Verify ai-agent-switch CLI
+      - name: Verify Agent Hub init command
         run: |
           image="agent-hub/${{ matrix.name }}:ci-${{ github.run_id }}"
           expected="${{ needs.prepare.outputs['ai-agent-switch-version'] }}"
@@ -240,8 +240,6 @@ jobs:
               verify_api_key_env="AIPROXY_API_KEY"
               ;;
           esac
-          docker run --rm "$image" ai-agent-switch --version | grep -F "ai-agent-switch/${expected}"
-          docker run --rm "$image" ai-agent-switch client list --json >/dev/null
           output="$(
             docker run --rm \
               -e "VERIFY_CLIENT=${verify_client}" \

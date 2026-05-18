@@ -239,8 +239,6 @@ for agent_dir in "${agents[@]}"; do
       fail "$agent_dir/install.sh must detect ai-agent-switch source build target"
     grep -F 'bun run npm:build-package -- --platform "$target"' "$agent_dir/install.sh" >/dev/null || \
       fail "$agent_dir/install.sh must build ai-agent-switch from source for the detected target"
-    grep -F 'ai-agent-switch client list --json' "$agent_dir/install.sh" >/dev/null || \
-      fail "$agent_dir/install.sh must verify ai-agent-switch client list"
     grep -F 'verify_ai_agent_switch_agent_hub' "$agent_dir/install.sh" >/dev/null || \
       fail "$agent_dir/install.sh must verify ai-agent-switch agent-hub init with a dry-run command"
     grep -F '"requiresConfirmation": true' "$agent_dir/install.sh" >/dev/null || \

@@ -36,8 +36,7 @@ bash test/ccswitch-smoke.sh
 
 - 构建镜像
 - 按默认 `start` 启动容器
-- 校验镜像内置的 `ai-agent-switch` CLI
-- 通过 `ai-agent-switch agent-hub init` 初始化原生模型配置
+- 通过 `ai-agent-switch agent-hub init` 校验并初始化原生模型配置
 - 通过 `ai-agent-switch client show <client> --json` 读取当前模型
 - 校验密钥通过环境变量引用，不写入明文 token
 - 校验配置文件已经被写入

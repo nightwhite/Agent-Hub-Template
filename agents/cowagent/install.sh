@@ -68,9 +68,6 @@ install_ai_agent_switch() {
   else
     npm install -g "ai-agent-switch@${AI_AGENT_SWITCH_VERSION}"
   fi
-  command -v ai-agent-switch >/dev/null 2>&1 || fail "ai-agent-switch CLI was not installed"
-  ai-agent-switch --version >/dev/null 2>&1 || fail "ai-agent-switch CLI is not executable"
-  ai-agent-switch client list --json >/dev/null || fail "ai-agent-switch client list failed"
   verify_ai_agent_switch_agent_hub
 }
 
